@@ -1904,6 +1904,7 @@ namespace dftfe
         mpi_communicator);
 
 
+
     KohnShamHamiltonianOperator<memorySpace> &kohnShamDFTEigenOperator =
       *d_kohnShamDFTOperatorPtr;
 

@@ -2048,26 +2048,26 @@ namespace dftfe
                 d_cellSqrtMassVectorCoeffType.data());
               d_inverseSqrtMassVectorCoeffType.resize(
                 mpiPatternP2P->localOwnedSize() +
-                mpiPatternP2P->localOwnedSize());
+                mpiPatternP2P->localGhostSize());
               d_BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
                 d_inverseSqrtMassVectorCoeffType.size(),
                 d_inverseSqrtMassVectorBasisType.data(),
                 d_inverseSqrtMassVectorCoeffType.data());
               d_sqrtMassVectorCoeffType.resize(mpiPatternP2P->localOwnedSize() +
-                                               mpiPatternP2P->localOwnedSize());
+                                               mpiPatternP2P->localGhostSize());
               d_BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
                 d_sqrtMassVectorCoeffType.size(),
                 d_sqrtMassVectorBasisType.data(),
                 d_sqrtMassVectorCoeffType.data());
               d_massVectorCoeffType.resize(mpiPatternP2P->localOwnedSize() +
-                                           mpiPatternP2P->localOwnedSize());
+                                           mpiPatternP2P->localGhostSize());
               d_BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
                 d_massVectorCoeffType.size(),
                 d_massVectorBasisType.data(),
                 d_massVectorCoeffType.data());
               d_inverseMassVectorCoeffType.resize(
                 mpiPatternP2P->localOwnedSize() +
-                mpiPatternP2P->localOwnedSize());
+                mpiPatternP2P->localGhostSize());
               d_BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
                 d_inverseMassVectorCoeffType.size(),
                 d_inverseMassVectorBasisType.data(),

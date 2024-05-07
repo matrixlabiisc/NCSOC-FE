@@ -226,13 +226,14 @@ namespace dftfe
             computingTimerStandard.enter_subsection("Lanczos upper bound");
           }
 
-        const std::pair<double, double> bounds =
-          linearAlgebraOperations::lanczosLowerUpperBoundEigenSpectrum(
+        const std::pair<double, double> bounds = linearAlgebraOperations::
+          generalisedLanczosLowerUpperBoundEigenSpectrum(
             BLASWrapperPtr,
             operatorMatrix,
             operatorMatrix.getScratchFEMultivector(1, 0),
             operatorMatrix.getScratchFEMultivector(1, 1),
             operatorMatrix.getScratchFEMultivector(1, 2),
+            operatorMatrix.getScratchFEMultivector(1, 3),
             d_dftParams);
 
         if (d_dftParams.deviceFineGrainedTimings)
@@ -258,13 +259,15 @@ namespace dftfe
             computingTimerStandard.enter_subsection("Lanczos upper bound");
           }
 
-        const std::pair<double, double> bounds =
-          linearAlgebraOperations::lanczosLowerUpperBoundEigenSpectrum(
+        const std::pair<double, double> bounds = linearAlgebraOperations::
+          generalisedLanczosLowerUpperBoundEigenSpectrum(
             BLASWrapperPtr,
             operatorMatrix,
             operatorMatrix.getScratchFEMultivector(1, 0),
             operatorMatrix.getScratchFEMultivector(1, 1),
             operatorMatrix.getScratchFEMultivector(1, 2),
+            operatorMatrix.getScratchFEMultivector(1, 3),
+
             d_dftParams);
 
         if (d_dftParams.deviceFineGrainedTimings)
@@ -558,17 +561,6 @@ namespace dftfe
     // if (d_dftParams.measureOnlyChebyTime)
     //  exit(0);
 
-    //
-    // scale the eigenVectors (initial guess of single atom wavefunctions or
-    // previous guess) to convert into Lowden Orthonormalized FE basis
-    // multiply by M^{1/2}
-    dftfe::utils::deviceKernelsGeneric::stridedBlockScale(
-      totalNumberWaveFunctions,
-      localVectorSize,
-      1.0,
-      operatorMatrix.getSqrtMassVector().data(),
-      eigenVectorsFlattenedDevice);
-
 
     if (d_dftParams.orthogType.compare("GS") == 0)
       {
@@ -607,7 +599,10 @@ namespace dftfe
           {
             linearAlgebraOperationsDevice::pseudoGramSchmidtOrthogonalization(
               elpaScala,
+              operatorMatrix,
               eigenVectorsFlattenedDevice,
+              (*XBlock),
+              (*HXBlock),
               localVectorSize,
               totalNumberWaveFunctions,
               d_mpiCommParent,
@@ -706,24 +701,8 @@ namespace dftfe
       }
 
     //
-    // scale the eigenVectors with M^{-1/2} to represent the wavefunctions in
-    // the usual FE basis
-    //
-    dftfe::utils::deviceKernelsGeneric::stridedBlockScale(
-      totalNumberWaveFunctions,
-      localVectorSize,
-      1.0,
-      operatorMatrix.getInverseSqrtMassVector().data(),
-      eigenVectorsFlattenedDevice);
 
 
-    if (eigenValues.size() != totalNumberWaveFunctions)
-      dftfe::utils::deviceKernelsGeneric::stridedBlockScale(
-        eigenValues.size(),
-        localVectorSize,
-        1.0,
-        operatorMatrix.getInverseSqrtMassVector().data(),
-        eigenVectorsRotFracDensityFlattenedDevice);
 
     return d_upperBoundUnWantedSpectrum;
   }
@@ -793,13 +772,14 @@ namespace dftfe
 
     if (!d_dftParams.reuseLanczosUpperBoundFromFirstCall)
       {
-        const std::pair<double, double> bounds =
-          linearAlgebraOperations::lanczosLowerUpperBoundEigenSpectrum(
+        const std::pair<double, double> bounds = linearAlgebraOperations::
+          generalisedLanczosLowerUpperBoundEigenSpectrum(
             BLASWrapperPtr,
             operatorMatrix,
             operatorMatrix.getScratchFEMultivector(1, 0),
             operatorMatrix.getScratchFEMultivector(1, 1),
             operatorMatrix.getScratchFEMultivector(1, 2),
+            operatorMatrix.getScratchFEMultivector(1, 3),
             d_dftParams);
 
         d_upperBoundUnWantedSpectrum = bounds.second;
@@ -1056,7 +1036,10 @@ namespace dftfe
 
         linearAlgebraOperationsDevice::pseudoGramSchmidtOrthogonalization(
           elpaScala,
+          operatorMatrix,
           eigenVectorsFlattenedDevice,
+          (*XBlock),
+          (*HXBlock),
           localVectorSize,
           totalNumberWaveFunctions,
           d_mpiCommParent,
@@ -1120,17 +1103,6 @@ namespace dftfe
     distributedDeviceVec<dataTypes::number> *HXBlock =
       &operatorMatrix.getScratchFEMultivector(vectorsBlockSize, 1);
 
-    //
-    // scale the eigenVectors (initial guess of single atom wavefunctions or
-    // previous guess) to convert into Lowden Orthonormalized FE basis
-    // multiply by M^{1/2}
-    dftfe::utils::deviceKernelsGeneric::stridedBlockScale(
-      totalNumberWaveFunctions,
-      localVectorSize,
-      1.0,
-      operatorMatrix.getSqrtMassVector().data(),
-      eigenVectorsFlattenedDevice);
-
 
 
     linearAlgebraOperationsDevice::densityMatrixEigenBasisFirstOrderResponse(
@@ -1152,17 +1124,6 @@ namespace dftfe
       d_dftParams);
 
 
-
-    //
-    // scale the eigenVectors with M^{-1/2} to represent the wavefunctions in
-    // the usual FE basis
-    //
-    dftfe::utils::deviceKernelsGeneric::stridedBlockScale(
-      totalNumberWaveFunctions,
-      localVectorSize,
-      1.0,
-      operatorMatrix.getInverseSqrtMassVector().data(),
-      eigenVectorsFlattenedDevice);
 
     dftfe::utils::deviceSynchronize();
     computingTimerStandard.leave_subsection(
