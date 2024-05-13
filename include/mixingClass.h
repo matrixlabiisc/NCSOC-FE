@@ -33,7 +33,11 @@ namespace dftfe
     rho,
     gradRho,
     magZ,
-    gradMagZ
+    gradMagZ,
+    magY,
+    gradMagY,
+    magX,
+    gradMagX,
   };
 
   /**

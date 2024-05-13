@@ -20,6 +20,70 @@
 #include <KohnShamHamiltonianOperator.h>
 namespace dftfe
 {
+  namespace internal
+  {
+    template <>
+    void
+    computeCellHamiltonianMatrixNonCollinearFromBlocks(
+      const std::pair<unsigned int, unsigned int> cellRange,
+      const unsigned int                          nDofsPerCell,
+      const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+        &tempHamMatrixRealBlock,
+      const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+        &tempHamMatrixImagBlock,
+      const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+        &tempHamMatrixBZBlockNonCollin,
+      const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+        &tempHamMatrixBYBlockNonCollin,
+      const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+        &tempHamMatrixBXBlockNonCollin,
+      dftfe::utils::MemoryStorage<std::complex<double>,
+                                  dftfe::utils::MemorySpace::HOST>
+        &cellHamiltonianMatrix)
+    {
+      for (unsigned int iCell = cellRange.first; iCell < cellRange.second;
+           ++iCell)
+        for (unsigned int iDoF = 0; iDoF < nDofsPerCell; ++iDoF)
+          for (unsigned int jDoF = 0; jDoF < nDofsPerCell; ++jDoF)
+            {
+              const double H_realIJ =
+                tempHamMatrixRealBlock[jDoF + nDofsPerCell * iDoF +
+                                       (iCell - cellRange.first) *
+                                         nDofsPerCell * nDofsPerCell];
+              const double H_imagIJ =
+                tempHamMatrixImagBlock[jDoF + nDofsPerCell * iDoF +
+                                       (iCell - cellRange.first) *
+                                         nDofsPerCell * nDofsPerCell];
+              const double H_bzIJ =
+                tempHamMatrixBZBlockNonCollin[jDoF + nDofsPerCell * iDoF +
+                                              (iCell - cellRange.first) *
+                                                nDofsPerCell * nDofsPerCell];
+              const double H_byIJ =
+                tempHamMatrixBYBlockNonCollin[jDoF + nDofsPerCell * iDoF +
+                                              (iCell - cellRange.first) *
+                                                nDofsPerCell * nDofsPerCell];
+              const double H_bxIJ =
+                tempHamMatrixBXBlockNonCollin[jDoF + nDofsPerCell * iDoF +
+                                              (iCell - cellRange.first) *
+                                                nDofsPerCell * nDofsPerCell];
+              cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
+                                    2 * nDofsPerCell * (2 * iDoF + 1) +
+                                    2 * jDoF + 1] =
+                std::complex<double>(H_realIJ - H_bzIJ, H_imagIJ);
+              cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
+                                    2 * nDofsPerCell * (2 * iDoF) + 2 * jDoF] =
+                std::complex<double>(H_realIJ + H_bzIJ, H_imagIJ);
+              cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
+                                    2 * nDofsPerCell * (2 * iDoF + 1) +
+                                    2 * jDoF] =
+                std::complex<double>(H_bxIJ, H_byIJ);
+              cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
+                                    2 * nDofsPerCell * (2 * iDoF) + 2 * jDoF +
+                                    1] = std::complex<double>(H_bxIJ, -H_byIJ);
+            }
+    }
+  }; // namespace internal
+
   //
   // constructor
   //
@@ -71,6 +135,9 @@ namespace dftfe
   {
     if (d_dftParamsPtr->isPseudopotential)
       d_ONCVnonLocalOperator = oncvClassPtr->getNonLocalOperator();
+    if (d_dftParamsPtr->isPseudopotential && d_dftParamsPtr->useSinglePrecCheby)
+      d_ONCVnonLocalOperatorSinglePrec =
+        oncvClassPtr->getNonLocalOperatorSinglePrec();
     d_cellsBlockSizeHamiltonianConstruction =
       memorySpace == dftfe::utils::MemorySpace::HOST ? 1 : 50;
     d_cellsBlockSizeHX = memorySpace == dftfe::utils::MemorySpace::HOST ?
@@ -110,19 +177,41 @@ namespace dftfe
       d_dftParamsPtr->memOptMode ?
         1 :
         (d_kPointWeights.size() * (d_dftParamsPtr->spinPolarized + 1)));
+    d_cellHamiltonianMatrixSinglePrec.resize(
+      d_dftParamsPtr->useSinglePrecCheby ? d_cellHamiltonianMatrix.size() : 0);
 
     const unsigned int nCells       = d_basisOperationsPtr->nCells();
     const unsigned int nDofsPerCell = d_basisOperationsPtr->nDofsPerCell();
     tempHamMatrixRealBlock.resize(nDofsPerCell * nDofsPerCell *
                                   d_cellsBlockSizeHamiltonianConstruction);
+    if (d_dftParamsPtr->noncolin)
+      {
+        tempHamMatrixBXBlockNonCollin.resize(
+          nDofsPerCell * nDofsPerCell *
+          d_cellsBlockSizeHamiltonianConstruction);
+        tempHamMatrixBYBlockNonCollin.resize(
+          nDofsPerCell * nDofsPerCell *
+          d_cellsBlockSizeHamiltonianConstruction);
+        tempHamMatrixBZBlockNonCollin.resize(
+          nDofsPerCell * nDofsPerCell *
+          d_cellsBlockSizeHamiltonianConstruction);
+      }
     if (std::is_same<dataTypes::number, std::complex<double>>::value)
       tempHamMatrixImagBlock.resize(nDofsPerCell * nDofsPerCell *
                                     d_cellsBlockSizeHamiltonianConstruction);
     for (unsigned int iHamiltonian = 0;
          iHamiltonian < d_cellHamiltonianMatrix.size();
          ++iHamiltonian)
-      d_cellHamiltonianMatrix[iHamiltonian].resize(nDofsPerCell * nDofsPerCell *
-                                                   nCells);
+      d_cellHamiltonianMatrix[iHamiltonian].resize(
+        nDofsPerCell * nDofsPerCell * nCells *
+        (d_dftParamsPtr->noncolin ? 4 : 1));
+    for (unsigned int iHamiltonian = 0;
+         iHamiltonian < d_cellHamiltonianMatrixSinglePrec.size();
+         ++iHamiltonian)
+      d_cellHamiltonianMatrixSinglePrec[iHamiltonian].resize(
+        nDofsPerCell * nDofsPerCell * nCells *
+        (d_dftParamsPtr->noncolin ? 4 : 1));
+
     d_basisOperationsPtrHost->reinit(0, 0, d_densityQuadratureID, false);
     const unsigned int numberQuadraturePoints =
       d_basisOperationsPtrHost->nQuadsPerCell();
@@ -222,9 +311,11 @@ namespace dftfe
   {
     const bool isGGA =
       d_excManagerPtr->getDensityBasedFamilyType() == densityFamilyType::GGA;
-    const unsigned int spinPolarizedFactor = 1 + d_dftParamsPtr->spinPolarized;
+    const unsigned int spinPolarizedFactor =
+      d_dftParamsPtr->noncolin ? 2 : (1 + d_dftParamsPtr->spinPolarized);
     const unsigned int spinPolarizedSigmaFactor =
-      d_dftParamsPtr->spinPolarized == 0 ? 1 : 3;
+      (d_dftParamsPtr->spinPolarized == 0 && !(d_dftParamsPtr->noncolin)) ? 1 :
+                                                                            3;
     d_basisOperationsPtrHost->reinit(0, 0, d_densityQuadratureID);
     const unsigned int totalLocallyOwnedCells =
       d_basisOperationsPtrHost->nCells();
@@ -234,15 +325,66 @@ namespace dftfe
     dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
       d_VeffJxWHost;
     dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_BeffxJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_BeffyJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_BeffzJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
       d_invJacderExcWithSigmaTimesGradRhoJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost;
+    dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+      d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost;
 #else
     auto &d_VeffJxWHost = d_VeffJxW;
+    auto &d_BeffxJxWHost = d_BeffxJxW;
+    auto &d_BeffyJxWHost = d_BeffyJxW;
+    auto &d_BeffzJxWHost = d_BeffzJxW;
     auto &d_invJacderExcWithSigmaTimesGradRhoJxWHost =
       d_invJacderExcWithSigmaTimesGradRhoJxW;
+    auto &d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost =
+      d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW;
+    auto &d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost =
+      d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW;
+    auto &d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost =
+      d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW;
 #endif
     d_VeffJxWHost.resize(totalLocallyOwnedCells * numberQuadraturePoints, 0.0);
+    d_BeffxJxWHost.resize(d_dftParamsPtr->noncolin ?
+                            3 * totalLocallyOwnedCells *
+                              numberQuadraturePoints :
+                            0,
+                          0.0);
+    d_BeffyJxWHost.resize(d_dftParamsPtr->noncolin ?
+                            3 * totalLocallyOwnedCells *
+                              numberQuadraturePoints :
+                            0,
+                          0.0);
+    d_BeffzJxWHost.resize(d_dftParamsPtr->noncolin ?
+                            3 * totalLocallyOwnedCells *
+                              numberQuadraturePoints :
+                            0,
+                          0.0);
     d_invJacderExcWithSigmaTimesGradRhoJxWHost.resize(
       isGGA ? totalLocallyOwnedCells * numberQuadraturePoints * 3 : 0, 0.0);
+    d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost.resize(
+      d_dftParamsPtr->noncolin && isGGA ?
+        totalLocallyOwnedCells * numberQuadraturePoints * 3 :
+        0,
+      0.0);
+    d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost.resize(
+      d_dftParamsPtr->noncolin && isGGA ?
+        totalLocallyOwnedCells * numberQuadraturePoints * 3 :
+        0,
+      0.0);
+    d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost.resize(
+      d_dftParamsPtr->noncolin && isGGA ?
+        totalLocallyOwnedCells * numberQuadraturePoints * 3 :
+        0,
+      0.0);
 
     // allocate storage for exchange potential
     std::vector<double> exchangePotentialVal(numberQuadraturePoints *
@@ -259,6 +401,10 @@ namespace dftfe
       isGGA ? numberQuadraturePoints * spinPolarizedSigmaFactor : 0);
     std::vector<double> gradDensityValue(
       isGGA ? 3 * numberQuadraturePoints * spinPolarizedFactor : 0);
+    std::vector<double> magNorm(
+      d_dftParamsPtr->noncolin ? numberQuadraturePoints : 0);
+    std::vector<double> magAxis(
+      d_dftParamsPtr->noncolin ? numberQuadraturePoints * 3 : 0);
     auto dot3 = [](const double *a, const double *b) {
       double sum = 0.0;
       for (unsigned int i = 0; i < 3; i++)
@@ -270,7 +416,45 @@ namespace dftfe
 
     for (unsigned int iCell = 0; iCell < totalLocallyOwnedCells; ++iCell)
       {
-        if (spinPolarizedFactor == 1)
+        if (d_dftParamsPtr->noncolin)
+          {
+            const double *cellRhoValues =
+              rhoValues[0].data() + iCell * numberQuadraturePoints;
+            const double *cellMagZValues =
+              rhoValues[1].data() + iCell * numberQuadraturePoints;
+            const double *cellMagYValues =
+              rhoValues[2].data() + iCell * numberQuadraturePoints;
+            const double *cellMagXValues =
+              rhoValues[3].data() + iCell * numberQuadraturePoints;
+            for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                 ++iQuad)
+              {
+                const double rhoByTwo = cellRhoValues[iQuad] / 2.0;
+                magNorm[iQuad] =
+                  std::sqrt(cellMagZValues[iQuad] * cellMagZValues[iQuad] +
+                            cellMagYValues[iQuad] * cellMagYValues[iQuad] +
+                            cellMagXValues[iQuad] * cellMagXValues[iQuad]);
+                if (magNorm[iQuad] > 1e-12)
+                  {
+                    magAxis[3 * iQuad + 0] =
+                      cellMagXValues[iQuad] / magNorm[iQuad];
+                    magAxis[3 * iQuad + 1] =
+                      cellMagYValues[iQuad] / magNorm[iQuad];
+                    magAxis[3 * iQuad + 2] =
+                      cellMagZValues[iQuad] / magNorm[iQuad];
+                  }
+                else
+                  {
+                    magAxis[3 * iQuad + 0] = 0.0;
+                    magAxis[3 * iQuad + 1] = 0.0;
+                    magAxis[3 * iQuad + 2] = 0.0;
+                  }
+                const double magByTwo       = magNorm[iQuad] / 2.0;
+                densityValue[2 * iQuad]     = rhoByTwo + magByTwo;
+                densityValue[2 * iQuad + 1] = rhoByTwo - magByTwo;
+              }
+          }
+        else if (spinPolarizedFactor == 1)
           std::memcpy(densityValue.data(),
                       rhoValues[0].data() + iCell * numberQuadraturePoints,
                       numberQuadraturePoints * sizeof(double));
@@ -290,7 +474,39 @@ namespace dftfe
               }
           }
         if (isGGA)
-          if (spinPolarizedFactor == 1)
+          if (d_dftParamsPtr->noncolin)
+            {
+              const double *cellGradRhoValues =
+                gradRhoValues[0].data() + 3 * iCell * numberQuadraturePoints;
+              const double *cellGradMagZValues =
+                gradRhoValues[1].data() + 3 * iCell * numberQuadraturePoints;
+              const double *cellGradMagYValues =
+                gradRhoValues[2].data() + 3 * iCell * numberQuadraturePoints;
+              const double *cellGradMagXValues =
+                gradRhoValues[3].data() + 3 * iCell * numberQuadraturePoints;
+              for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                   ++iQuad)
+                {
+                  for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                    {
+                      const double gradRhoByTwo =
+                        cellGradRhoValues[3 * iQuad + iDim] / 2.0;
+                      double gradMagByTwo =
+                        (magAxis[3 * iQuad + 2] *
+                           cellGradMagZValues[3 * iQuad + iDim] +
+                         magAxis[3 * iQuad + 1] *
+                           cellGradMagYValues[3 * iQuad + iDim] +
+                         magAxis[3 * iQuad + 0] *
+                           cellGradMagXValues[3 * iQuad + iDim]) /
+                        2.0;
+                      gradDensityValue[6 * iQuad + iDim] =
+                        gradRhoByTwo + gradMagByTwo;
+                      gradDensityValue[6 * iQuad + 3 + iDim] =
+                        gradRhoByTwo - gradMagByTwo;
+                    }
+                }
+            }
+          else if (spinPolarizedFactor == 1)
             std::memcpy(gradDensityValue.data(),
                         gradRhoValues[0].data() +
                           iCell * numberQuadraturePoints * 3,
@@ -421,18 +637,42 @@ namespace dftfe
           outputDerCorrEnergy);
         auto cellJxWPtr = d_basisOperationsPtrHost->JxWBasisData().data() +
                           iCell * numberQuadraturePoints;
-        for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints; ++iQuad)
+        if (spinPolarizedFactor == 1)
+          for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints; ++iQuad)
+            d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] =
+              (tempPhi[iQuad] + exchangePotentialVal[iQuad] +
+               corrPotentialVal[iQuad]) *
+              cellJxWPtr[iQuad];
+        else if (!d_dftParamsPtr->noncolin)
+          for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints; ++iQuad)
+            d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] =
+              (tempPhi[iQuad] + exchangePotentialVal[2 * iQuad + spinIndex] +
+               corrPotentialVal[2 * iQuad + spinIndex]) *
+              cellJxWPtr[iQuad];
+        else
           {
-            if (spinPolarizedFactor == 1)
-              d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] =
-                (tempPhi[iQuad] + exchangePotentialVal[iQuad] +
-                 corrPotentialVal[iQuad]) *
-                cellJxWPtr[iQuad];
-            else
-              d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] =
-                (tempPhi[iQuad] + exchangePotentialVal[2 * iQuad + spinIndex] +
-                 corrPotentialVal[2 * iQuad + spinIndex]) *
-                cellJxWPtr[iQuad];
+            for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                 ++iQuad)
+              {
+                d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] =
+                  (tempPhi[iQuad] + 0.5 * (exchangePotentialVal[2 * iQuad + 0] +
+                                           exchangePotentialVal[2 * iQuad + 1] +
+                                           corrPotentialVal[2 * iQuad + 0] +
+                                           corrPotentialVal[2 * iQuad + 1])) *
+                  cellJxWPtr[iQuad];
+                const double temp = 0.5 *
+                                    (exchangePotentialVal[2 * iQuad + 0] -
+                                     exchangePotentialVal[2 * iQuad + 1] +
+                                     corrPotentialVal[2 * iQuad + 0] -
+                                     corrPotentialVal[2 * iQuad + 1]) *
+                                    cellJxWPtr[iQuad];
+                d_BeffxJxWHost[iCell * numberQuadraturePoints + iQuad] =
+                  temp * magAxis[3 * iQuad + 0];
+                d_BeffyJxWHost[iCell * numberQuadraturePoints + iQuad] =
+                  temp * magAxis[3 * iQuad + 1];
+                d_BeffzJxWHost[iCell * numberQuadraturePoints + iQuad] =
+                  temp * magAxis[3 * iQuad + 2];
+              }
           }
         if (isGGA)
           {
@@ -485,7 +725,7 @@ namespace dftfe
                       }
                   }
               }
-            else if (spinPolarizedFactor == 2)
+            else if (!d_dftParamsPtr->noncolin)
               {
                 if (d_basisOperationsPtrHost->cellsTypeFlag() != 2)
                   {
@@ -556,6 +796,243 @@ namespace dftfe
                       }
                   }
               }
+            else
+              {
+                const double *cellGradMagZValues =
+                  gradRhoValues[1].data() + 3 * iCell * numberQuadraturePoints;
+                const double *cellGradMagYValues =
+                  gradRhoValues[2].data() + 3 * iCell * numberQuadraturePoints;
+                const double *cellGradMagXValues =
+                  gradRhoValues[3].data() + 3 * iCell * numberQuadraturePoints;
+                if (d_basisOperationsPtrHost->cellsTypeFlag() != 2)
+                  {
+                    for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                         ++iQuad)
+                      {
+                        const double *inverseJacobiansQuadPtr =
+                          d_basisOperationsPtrHost->inverseJacobiansBasisData()
+                            .data() +
+                          (d_basisOperationsPtrHost->cellsTypeFlag() == 0 ?
+                             iCell * numberQuadraturePoints * 9 + iQuad * 9 :
+                             iCell * 9);
+                        const double *gradDensitySpin0QuadPtr =
+                          gradDensityValue.data() + 6 * iQuad;
+                        const double *gradDensitySpin1QuadPtr =
+                          gradDensityValue.data() + 6 * iQuad + 3;
+                        const double termSpin0 =
+                          (derExchEnergyWithSigmaVal[3 * iQuad] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad]) *
+                          cellJxWPtr[iQuad];
+                        const double termSpin1 =
+                          (derExchEnergyWithSigmaVal[3 * iQuad + 2] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad + 2]) *
+                          cellJxWPtr[iQuad];
+                        const double termSpinCross =
+                          (derExchEnergyWithSigmaVal[3 * iQuad + 1] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad + 1]) *
+                          cellJxWPtr[iQuad];
+                        for (unsigned jDim = 0; jDim < 3; ++jDim)
+                          for (unsigned iDim = 0; iDim < 3; ++iDim)
+                            d_invJacderExcWithSigmaTimesGradRhoJxWHost
+                              [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
+                               iDim] +=
+                              inverseJacobiansQuadPtr[3 * jDim + iDim] *
+                              (gradDensitySpin0QuadPtr[jDim] * termSpin0 +
+                               gradDensitySpin1QuadPtr[jDim] * termSpin1 +
+                               0.5 *
+                                 (gradDensitySpin0QuadPtr[jDim] +
+                                  gradDensitySpin1QuadPtr[jDim]) *
+                                 termSpinCross);
+                        for (unsigned jDim = 0; jDim < 3; ++jDim)
+                          {
+                            const double term =
+                              (gradDensitySpin0QuadPtr[jDim] * termSpin0 -
+                               gradDensitySpin1QuadPtr[jDim] * termSpin1 +
+                               0.5 *
+                                 (gradDensitySpin1QuadPtr[jDim] -
+                                  gradDensitySpin0QuadPtr[jDim]) *
+                                 termSpinCross);
+                            for (unsigned iDim = 0; iDim < 3; ++iDim)
+                              {
+                                const double termJac =
+                                  inverseJacobiansQuadPtr[3 * jDim + iDim] *
+                                  term;
+                                d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost
+                                  [iCell * numberQuadraturePoints * 3 +
+                                   iQuad * 3 + iDim] +=
+                                  termJac * magAxis[3 * iQuad + 0];
+                                d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost
+                                  [iCell * numberQuadraturePoints * 3 +
+                                   iQuad * 3 + iDim] +=
+                                  termJac * magAxis[3 * iQuad + 1];
+                                d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost
+                                  [iCell * numberQuadraturePoints * 3 +
+                                   iQuad * 3 + iDim] +=
+                                  termJac * magAxis[3 * iQuad + 2];
+                              }
+                            if (magNorm[iQuad] > 1e-12)
+                              {
+                                const double term2 =
+                                  (magAxis[3 * iQuad + 0] *
+                                     cellGradMagXValues[3 * iQuad + jDim] +
+                                   magAxis[3 * iQuad + 1] *
+                                     cellGradMagYValues[3 * iQuad + jDim] +
+                                   magAxis[3 * iQuad + 2] *
+                                     cellGradMagZValues[3 * iQuad + jDim]);
+                                const double BXTerm =
+                                  (cellGradMagXValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 0]) /
+                                  magNorm[iQuad];
+                                const double BYTerm =
+                                  (cellGradMagYValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 1]) /
+                                  magNorm[iQuad];
+                                const double BZTerm =
+                                  (cellGradMagZValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 2]) /
+                                  magNorm[iQuad];
+                                d_BeffxJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += term * BXTerm;
+                                d_BeffyJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += term * BYTerm;
+                                d_BeffzJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += term * BZTerm;
+                              }
+                          }
+                      }
+                  }
+                else if (d_basisOperationsPtrHost->cellsTypeFlag() == 2)
+                  {
+                    for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                         ++iQuad)
+                      {
+                        const double *inverseJacobiansQuadPtr =
+                          d_basisOperationsPtrHost->inverseJacobiansBasisData()
+                            .data() +
+                          iCell * 3;
+                        const double *gradDensitySpin0QuadPtr =
+                          gradDensityValue.data() + 6 * iQuad;
+                        const double *gradDensitySpin1QuadPtr =
+                          gradDensityValue.data() + 6 * iQuad + 3;
+                        const double termSpin0 =
+                          (derExchEnergyWithSigmaVal[3 * iQuad] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad]) *
+                          cellJxWPtr[iQuad];
+                        const double termSpin1 =
+                          (derExchEnergyWithSigmaVal[3 * iQuad + 2] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad + 2]) *
+                          cellJxWPtr[iQuad];
+                        const double termSpinCross =
+                          (derExchEnergyWithSigmaVal[3 * iQuad + 1] +
+                           derCorrEnergyWithSigmaVal[3 * iQuad + 1]) *
+                          cellJxWPtr[iQuad];
+                        for (unsigned jDim = 0; jDim < 3; ++jDim)
+                          {
+                            const double termMinus =
+                              (gradDensitySpin0QuadPtr[jDim] * termSpin0 -
+                               gradDensitySpin1QuadPtr[jDim] * termSpin1 +
+                               0.5 *
+                                 (gradDensitySpin1QuadPtr[jDim] -
+                                  gradDensitySpin0QuadPtr[jDim]) *
+                                 termSpinCross);
+                            const double termPlus =
+                              (gradDensitySpin0QuadPtr[jDim] * termSpin0 +
+                               gradDensitySpin1QuadPtr[jDim] * termSpin1 +
+                               0.5 *
+                                 (gradDensitySpin1QuadPtr[jDim] +
+                                  gradDensitySpin0QuadPtr[jDim]) *
+                                 termSpinCross);
+                            const double termMinusJac =
+                              inverseJacobiansQuadPtr[jDim] * termMinus;
+                            const double termPlusJac =
+                              inverseJacobiansQuadPtr[jDim] * termPlus;
+                            d_invJacderExcWithSigmaTimesGradRhoJxWHost
+                              [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
+                               jDim] = termPlusJac;
+                            d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost
+                              [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
+                               jDim] = termMinusJac * magAxis[3 * iQuad + 0];
+                            d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost
+                              [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
+                               jDim] = termMinusJac * magAxis[3 * iQuad + 1];
+                            d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost
+                              [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
+                               jDim] = termMinusJac * magAxis[3 * iQuad + 2];
+                            if (magNorm[iQuad] > 1e-12)
+                              {
+                                // const double term2 =
+                                //   (magAxis[3 * iQuad + 0] *
+                                //      cellGradMagXValues[3 * iQuad + jDim] +
+                                //    magAxis[3 * iQuad + 1] *
+                                //      cellGradMagYValues[3 * iQuad + jDim] +
+                                //    magAxis[3 * iQuad + 2] *
+                                //      cellGradMagZValues[3 * iQuad + jDim]);
+                                // const double BXTerm =
+                                //   (cellGradMagXValues[3 * iQuad + jDim] -
+                                //    term2 * magAxis[3 * iQuad + 0]) /
+                                //   magNorm[iQuad];
+                                // const double BYTerm =
+                                //   (cellGradMagYValues[3 * iQuad + jDim] -
+                                //    term2 * magAxis[3 * iQuad + 1]) /
+                                //   magNorm[iQuad];
+                                // const double BZTerm =
+                                //   (cellGradMagZValues[3 * iQuad + jDim] -
+                                //    term2 * magAxis[3 * iQuad + 2]) /
+                                //   magNorm[iQuad];
+                                // d_BeffxJxWHost[iCell * numberQuadraturePoints
+                                // +
+                                //                iQuad] +=
+                                //   (cellGradMagXValues[3 * iQuad + jDim] *
+                                //      termPlus -
+                                //    termMinus * term2 * magAxis[3 * iQuad +
+                                //    0]) /
+                                //   magNorm[iQuad];
+                                // d_BeffyJxWHost[iCell * numberQuadraturePoints
+                                // +
+                                //                iQuad] +=
+                                //   (cellGradMagYValues[3 * iQuad + jDim] *
+                                //      termPlus -
+                                //    termMinus * term2 * magAxis[3 * iQuad +
+                                //    1]) /
+                                //   magNorm[iQuad];
+                                // d_BeffzJxWHost[iCell * numberQuadraturePoints
+                                // +
+                                //                iQuad] +=
+                                //   (cellGradMagZValues[3 * iQuad + jDim] *
+                                //      termPlus -
+                                //    termMinus * term2 * magAxis[3 * iQuad +
+                                //    2]) /
+                                //   magNorm[iQuad];
+                                const double term2 =
+                                  (magAxis[3 * iQuad + 0] *
+                                     cellGradMagXValues[3 * iQuad + jDim] +
+                                   magAxis[3 * iQuad + 1] *
+                                     cellGradMagYValues[3 * iQuad + jDim] +
+                                   magAxis[3 * iQuad + 2] *
+                                     cellGradMagZValues[3 * iQuad + jDim]);
+                                const double BXTerm =
+                                  (cellGradMagXValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 0]) /
+                                  magNorm[iQuad];
+                                const double BYTerm =
+                                  (cellGradMagYValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 1]) /
+                                  magNorm[iQuad];
+                                const double BZTerm =
+                                  (cellGradMagZValues[3 * iQuad + jDim] -
+                                   term2 * magAxis[3 * iQuad + 2]) /
+                                  magNorm[iQuad];
+                                d_BeffxJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += termMinus * BXTerm;
+                                d_BeffyJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += termMinus * BYTerm;
+                                d_BeffzJxWHost[iCell * numberQuadraturePoints +
+                                               iQuad] += termMinus * BZTerm;
+                              }
+                          }
+                      }
+                  }
+              }
           }
       }
 #if defined(DFTFE_WITH_DEVICE)
@@ -565,6 +1042,27 @@ namespace dftfe
       d_invJacderExcWithSigmaTimesGradRhoJxWHost.size());
     d_invJacderExcWithSigmaTimesGradRhoJxW.copyFrom(
       d_invJacderExcWithSigmaTimesGradRhoJxWHost);
+    if (d_dftParamsPtr->noncolin)
+      {
+        d_BeffxJxW.resize(d_BeffxJxWHost.size());
+        d_BeffxJxW.copyFrom(d_BeffxJxWHost);
+        d_BeffyJxW.resize(d_BeffyJxWHost.size());
+        d_BeffyJxW.copyFrom(d_BeffyJxWHost);
+        d_BeffzJxW.resize(d_BeffzJxWHost.size());
+        d_BeffzJxW.copyFrom(d_BeffzJxWHost);
+        d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW.resize(
+          d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost.size());
+        d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW.copyFrom(
+          d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost);
+        d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW.resize(
+          d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost.size());
+        d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW.copyFrom(
+          d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost);
+        d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW.resize(
+          d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost.size());
+        d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW.copyFrom(
+          d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost);
+      }
 #endif
   }
   template <dftfe::utils::MemorySpace memorySpace>
@@ -617,6 +1115,11 @@ namespace dftfe
     if constexpr (dftfe::utils::MemorySpace::DEVICE == memorySpace)
       if (d_dftParamsPtr->isPseudopotential)
         d_ONCVnonLocalOperator->initialiseOperatorActionOnX(d_kPointIndex);
+    if constexpr (dftfe::utils::MemorySpace::DEVICE == memorySpace)
+      if (d_dftParamsPtr->isPseudopotential &&
+          d_dftParamsPtr->useSinglePrecCheby)
+        d_ONCVnonLocalOperatorSinglePrec->initialiseOperatorActionOnX(
+          d_kPointIndex);
   }
 
 
@@ -631,10 +1134,20 @@ namespace dftfe
         nCells * nDofsPerCell * numWaveFunctions)
       d_cellWaveFunctionMatrixSrc.resize(nCells * nDofsPerCell *
                                          numWaveFunctions);
+    if (d_dftParamsPtr->useSinglePrecCheby &&
+        d_cellWaveFunctionMatrixSrcSinglePrec.size() <
+          nCells * nDofsPerCell * numWaveFunctions)
+      d_cellWaveFunctionMatrixSrcSinglePrec.resize(nCells * nDofsPerCell *
+                                                   numWaveFunctions);
     if (d_cellWaveFunctionMatrixDst.size() <
         d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
       d_cellWaveFunctionMatrixDst.resize(d_cellsBlockSizeHX * nDofsPerCell *
                                          numWaveFunctions);
+    if (d_dftParamsPtr->useSinglePrecCheby &&
+        d_cellWaveFunctionMatrixDstSinglePrec.size() <
+          d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
+      d_cellWaveFunctionMatrixDstSinglePrec.resize(
+        d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions);
 
     if (d_dftParamsPtr->isPseudopotential)
       {
@@ -649,6 +1162,23 @@ namespace dftfe
           d_ONCVnonLocalOperator->initialiseFlattenedDataStructure(
             numWaveFunctions, d_ONCVNonLocalProjectorTimesVectorBlock);
       }
+    if (d_dftParamsPtr->isPseudopotential && d_dftParamsPtr->useSinglePrecCheby)
+      {
+        if constexpr (dftfe::utils::MemorySpace::DEVICE == memorySpace)
+          {
+            d_ONCVnonLocalOperatorSinglePrec->initialiseFlattenedDataStructure(
+              numWaveFunctions,
+              d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec);
+            d_ONCVnonLocalOperatorSinglePrec
+              ->initialiseCellWaveFunctionPointers(
+                d_cellWaveFunctionMatrixSrcSinglePrec);
+          }
+        else
+          d_ONCVnonLocalOperatorSinglePrec->initialiseFlattenedDataStructure(
+            numWaveFunctions,
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec);
+      }
+
     d_basisOperationsPtr->reinit(numWaveFunctions,
                                  d_cellsBlockSizeHX,
                                  d_densityQuadratureID,
@@ -693,7 +1223,18 @@ namespace dftfe
     const unsigned int numVectors,
     const unsigned int index)
   {
-    return d_basisOperationsPtr->getMultiVector(numVectors, index);
+    return d_basisOperationsPtr->getMultiVector(
+      numVectors * (d_dftParamsPtr->noncolin ? 2 : 1), index);
+  }
+
+  template <dftfe::utils::MemorySpace memorySpace>
+  dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace> &
+  KohnShamHamiltonianOperator<memorySpace>::getScratchFEMultivectorSinglePrec(
+    const unsigned int numVectors,
+    const unsigned int index)
+  {
+    return d_basisOperationsPtr->getMultiVectorSinglePrec(
+      numVectors * (d_dftParamsPtr->noncolin ? 2 : 1), index);
   }
 
   template <dftfe::utils::MemorySpace memorySpace>
@@ -764,6 +1305,38 @@ namespace dftfe
             cellRange,
             d_invJacderExcWithSigmaTimesGradRhoJxW,
             tempHamMatrixRealBlock);
+        if (d_dftParamsPtr->noncolin)
+          {
+            tempHamMatrixBZBlockNonCollin.setValue(0.0);
+            tempHamMatrixBYBlockNonCollin.setValue(0.0);
+            tempHamMatrixBXBlockNonCollin.setValue(0.0);
+            d_basisOperationsPtr->computeWeightedCellMassMatrix(
+              cellRange, d_BeffzJxW, tempHamMatrixBZBlockNonCollin);
+            d_basisOperationsPtr->computeWeightedCellMassMatrix(
+              cellRange, d_BeffyJxW, tempHamMatrixBYBlockNonCollin);
+            d_basisOperationsPtr->computeWeightedCellMassMatrix(
+              cellRange, d_BeffxJxW, tempHamMatrixBXBlockNonCollin);
+
+            if (d_excManagerPtr->getDensityBasedFamilyType() ==
+                densityFamilyType::GGA)
+              {
+                d_basisOperationsPtr
+                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
+                    cellRange,
+                    d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW,
+                    tempHamMatrixBZBlockNonCollin);
+                d_basisOperationsPtr
+                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
+                    cellRange,
+                    d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW,
+                    tempHamMatrixBYBlockNonCollin);
+                d_basisOperationsPtr
+                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
+                    cellRange,
+                    d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW,
+                    tempHamMatrixBXBlockNonCollin);
+              }
+          }
         if (!onlyHPrimePartForFirstOrderDensityMatResponse)
           d_BLASWrapperPtr->xaxpy(
             nDofsPerCell * nDofsPerCell * (cellRange.second - cellRange.first),
@@ -786,27 +1359,43 @@ namespace dftfe
                   0.5 * (kPointCoors[0] * kPointCoors[0] +
                          kPointCoors[1] * kPointCoors[1] +
                          kPointCoors[2] * kPointCoors[2]);
-                d_BLASWrapperPtr->xaxpy(
-                  nDofsPerCell * nDofsPerCell *
-                    (cellRange.second - cellRange.first),
-                  &kSquareTimesHalf,
-                  d_basisOperationsPtr->cellMassMatrixBasisData().data() +
-                    cellRange.first * nDofsPerCell * nDofsPerCell,
-                  1,
-                  tempHamMatrixRealBlock.data(),
-                  1);
-                d_basisOperationsPtr->computeWeightedCellNjGradNiMatrix(
-                  cellRange,
-                  d_invJacKPointTimesJxW[d_kPointIndex],
-                  tempHamMatrixImagBlock);
+                if (kSquareTimesHalf > 1e-12)
+                  {
+                    d_BLASWrapperPtr->xaxpy(
+                      nDofsPerCell * nDofsPerCell *
+                        (cellRange.second - cellRange.first),
+                      &kSquareTimesHalf,
+                      d_basisOperationsPtr->cellMassMatrixBasisData().data() +
+                        cellRange.first * nDofsPerCell * nDofsPerCell,
+                      1,
+                      tempHamMatrixRealBlock.data(),
+                      1);
+                    d_basisOperationsPtr->computeWeightedCellNjGradNiMatrix(
+                      cellRange,
+                      d_invJacKPointTimesJxW[d_kPointIndex],
+                      tempHamMatrixImagBlock);
+                  }
               }
-            d_BLASWrapperPtr->copyRealArrsToComplexArr(
-              nDofsPerCell * nDofsPerCell *
-                (cellRange.second - cellRange.first),
-              tempHamMatrixRealBlock.data(),
-              tempHamMatrixImagBlock.data(),
-              d_cellHamiltonianMatrix[d_HamiltonianIndex].data() +
-                cellRange.first * nDofsPerCell * nDofsPerCell);
+            if (!d_dftParamsPtr->noncolin)
+              d_BLASWrapperPtr->copyRealArrsToComplexArr(
+                nDofsPerCell * nDofsPerCell *
+                  (cellRange.second - cellRange.first),
+                tempHamMatrixRealBlock.data(),
+                tempHamMatrixImagBlock.data(),
+                d_cellHamiltonianMatrix[d_HamiltonianIndex].data() +
+                  cellRange.first * nDofsPerCell * nDofsPerCell);
+            else
+              {
+                internal::computeCellHamiltonianMatrixNonCollinearFromBlocks(
+                  cellRange,
+                  nDofsPerCell,
+                  tempHamMatrixRealBlock,
+                  tempHamMatrixImagBlock,
+                  tempHamMatrixBZBlockNonCollin,
+                  tempHamMatrixBYBlockNonCollin,
+                  tempHamMatrixBXBlockNonCollin,
+                  d_cellHamiltonianMatrix[d_HamiltonianIndex]);
+              }
           }
         else
           {
@@ -820,6 +1409,11 @@ namespace dftfe
               1);
           }
       }
+    if (d_dftParamsPtr->useSinglePrecCheby)
+      d_BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
+        d_cellHamiltonianMatrix[d_HamiltonianIndex].size(),
+        d_cellHamiltonianMatrix[d_HamiltonianIndex].data(),
+        d_cellHamiltonianMatrixSinglePrec[d_HamiltonianIndex].data());
     if (d_dftParamsPtr->memOptMode)
       if ((d_dftParamsPtr->isPseudopotential ||
            d_dftParamsPtr->smearedNuclearCharges) &&
@@ -841,12 +1435,13 @@ namespace dftfe
   {
     const unsigned int numCells       = d_basisOperationsPtr->nCells();
     const unsigned int numDoFsPerCell = d_basisOperationsPtr->nDofsPerCell();
-    const unsigned int numberWavefunctions = src.numVectors();
-    if (d_numVectorsInternal != numberWavefunctions)
-      reinitNumberWavefunctions(numberWavefunctions);
+    const unsigned int spinorFactor   = d_dftParamsPtr->noncolin ? 2 : 1;
+    const unsigned int numberWavefunctions = src.numVectors() / spinorFactor;
+    if (d_numVectorsInternal != numberWavefunctions * spinorFactor)
+      reinitNumberWavefunctions(numberWavefunctions * spinorFactor);
 
-    if (d_basisOperationsPtr->d_nVectors != numberWavefunctions)
-      d_basisOperationsPtr->reinit(numberWavefunctions,
+    if (d_basisOperationsPtr->d_nVectors != numberWavefunctions * spinorFactor)
+      d_basisOperationsPtr->reinit(numberWavefunctions * spinorFactor,
                                    d_cellsBlockSizeHX,
                                    d_densityQuadratureID,
                                    false,
@@ -874,18 +1469,20 @@ namespace dftfe
         std::pair<unsigned int, unsigned int> cellRange(
           iCell, std::min(iCell + d_cellsBlockSizeHX, numCells));
         d_BLASWrapperPtr->stridedCopyToBlock(
-          numberWavefunctions,
+          numberWavefunctions * spinorFactor,
           numDoFsPerCell * (cellRange.second - cellRange.first),
           src.data(),
           d_cellWaveFunctionMatrixSrc.data() +
-            cellRange.first * numDoFsPerCell * numberWavefunctions,
+            cellRange.first * numDoFsPerCell * numberWavefunctions *
+              spinorFactor,
           d_basisOperationsPtr->d_flattenedCellDofIndexToProcessDofIndexMap
               .data() +
             cellRange.first * numDoFsPerCell);
         if (hasNonlocalComponents)
           d_ONCVnonLocalOperator->applyCconjtransOnX(
             d_cellWaveFunctionMatrixSrc.data() +
-              cellRange.first * numDoFsPerCell * numberWavefunctions,
+              cellRange.first * numDoFsPerCell * numberWavefunctions *
+                spinorFactor,
             cellRange);
       }
     if (d_dftParamsPtr->isPseudopotential &&
@@ -909,27 +1506,29 @@ namespace dftfe
           'N',
           'N',
           numberWavefunctions,
-          numDoFsPerCell,
-          numDoFsPerCell,
+          numDoFsPerCell * spinorFactor,
+          numDoFsPerCell * spinorFactor,
           &scalarCoeffAlpha,
           d_cellWaveFunctionMatrixSrc.data() +
-            cellRange.first * numDoFsPerCell * numberWavefunctions,
+            cellRange.first * numDoFsPerCell * numberWavefunctions *
+              spinorFactor,
           numberWavefunctions,
-          numDoFsPerCell * numberWavefunctions,
+          numDoFsPerCell * spinorFactor * numberWavefunctions,
           d_cellHamiltonianMatrix[d_HamiltonianIndex].data() +
-            cellRange.first * numDoFsPerCell * numDoFsPerCell,
-          numDoFsPerCell,
-          numDoFsPerCell * numDoFsPerCell,
+            cellRange.first * numDoFsPerCell * numDoFsPerCell * spinorFactor *
+              spinorFactor,
+          numDoFsPerCell * spinorFactor,
+          numDoFsPerCell * spinorFactor * numDoFsPerCell * spinorFactor,
           &scalarCoeffBeta,
           d_cellWaveFunctionMatrixDst.data(),
           numberWavefunctions,
-          numDoFsPerCell * numberWavefunctions,
+          numDoFsPerCell * spinorFactor * numberWavefunctions,
           cellRange.second - cellRange.first);
         if (hasNonlocalComponents)
           d_ONCVnonLocalOperator->applyCOnVCconjtransX(
             d_cellWaveFunctionMatrixDst.data(), cellRange);
         d_BLASWrapperPtr->axpyStridedBlockAtomicAdd(
-          numberWavefunctions,
+          numberWavefunctions * spinorFactor,
           numDoFsPerCell * (cellRange.second - cellRange.first),
           d_cellWaveFunctionMatrixDst.data(),
           dst.data(),
@@ -1069,12 +1668,13 @@ namespace dftfe
   {
     const unsigned int numCells       = d_basisOperationsPtr->nCells();
     const unsigned int numDoFsPerCell = d_basisOperationsPtr->nDofsPerCell();
-    const unsigned int numberWavefunctions = src.numVectors();
-    if (d_numVectorsInternal != numberWavefunctions)
-      reinitNumberWavefunctions(numberWavefunctions);
+    const unsigned int spinorFactor   = d_dftParamsPtr->noncolin ? 2 : 1;
+    const unsigned int numberWavefunctions = src.numVectors() / spinorFactor;
+    if (d_numVectorsInternal != numberWavefunctions * spinorFactor)
+      reinitNumberWavefunctions(numberWavefunctions * spinorFactor);
 
-    if (d_basisOperationsPtr->d_nVectors != numberWavefunctions)
-      d_basisOperationsPtr->reinit(numberWavefunctions,
+    if (d_basisOperationsPtr->d_nVectors != numberWavefunctions * spinorFactor)
+      d_basisOperationsPtr->reinit(numberWavefunctions * spinorFactor,
                                    d_cellsBlockSizeHX,
                                    d_densityQuadratureID,
                                    false,
@@ -1101,18 +1701,20 @@ namespace dftfe
             std::pair<unsigned int, unsigned int> cellRange(
               iCell, std::min(iCell + d_cellsBlockSizeHX, numCells));
             d_BLASWrapperPtr->stridedCopyToBlock(
-              numberWavefunctions,
+              numberWavefunctions * spinorFactor,
               numDoFsPerCell * (cellRange.second - cellRange.first),
               src.data(),
               d_cellWaveFunctionMatrixSrc.data() +
-                cellRange.first * numDoFsPerCell * numberWavefunctions,
+                cellRange.first * numDoFsPerCell * numberWavefunctions *
+                  spinorFactor,
               d_basisOperationsPtr->d_flattenedCellDofIndexToProcessDofIndexMap
                   .data() +
                 cellRange.first * numDoFsPerCell);
             if (hasNonlocalComponents)
               d_ONCVnonLocalOperator->applyCconjtransOnX(
                 d_cellWaveFunctionMatrixSrc.data() +
-                  cellRange.first * numDoFsPerCell * numberWavefunctions,
+                  cellRange.first * numDoFsPerCell * numberWavefunctions *
+                    spinorFactor,
                 cellRange);
           }
       }
@@ -1164,27 +1766,29 @@ namespace dftfe
               'N',
               'N',
               numberWavefunctions,
-              numDoFsPerCell,
-              numDoFsPerCell,
+              numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor,
               &scalarCoeffAlpha,
               d_cellWaveFunctionMatrixSrc.data() +
-                cellRange.first * numDoFsPerCell * numberWavefunctions,
+                cellRange.first * numDoFsPerCell * spinorFactor *
+                  numberWavefunctions,
               numberWavefunctions,
-              numDoFsPerCell * numberWavefunctions,
+              numDoFsPerCell * spinorFactor * numberWavefunctions,
               d_cellHamiltonianMatrix[d_HamiltonianIndex].data() +
-                cellRange.first * numDoFsPerCell * numDoFsPerCell,
-              numDoFsPerCell,
-              numDoFsPerCell * numDoFsPerCell,
+                cellRange.first * numDoFsPerCell * spinorFactor *
+                  numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor * numDoFsPerCell * spinorFactor,
               &scalarCoeffBeta,
               d_cellWaveFunctionMatrixDst.data(),
               numberWavefunctions,
-              numDoFsPerCell * numberWavefunctions,
+              numDoFsPerCell * spinorFactor * numberWavefunctions,
               cellRange.second - cellRange.first);
             if (hasNonlocalComponents)
               d_ONCVnonLocalOperator->applyCOnVCconjtransX(
                 d_cellWaveFunctionMatrixDst.data(), cellRange);
             d_BLASWrapperPtr->axpyStridedBlockAtomicAdd(
-              numberWavefunctions,
+              numberWavefunctions * spinorFactor,
               numDoFsPerCell * (cellRange.second - cellRange.first),
               scalarHX,
               d_basisOperationsPtr->cellInverseMassVectorBasisData().data() +
@@ -1205,7 +1809,167 @@ namespace dftfe
         dst.zeroOutGhosts();
       }
   }
+  template <dftfe::utils::MemorySpace memorySpace>
+  void
+  KohnShamHamiltonianOperator<memorySpace>::HXCheby(
+    dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace> &src,
+    const double scalarHX,
+    const double scalarY,
+    const double scalarX,
+    dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace> &dst,
+    const bool onlyHPrimePartForFirstOrderDensityMatResponse,
+    const bool skip1,
+    const bool skip2,
+    const bool skip3)
+  {
+    const unsigned int numCells       = d_basisOperationsPtr->nCells();
+    const unsigned int numDoFsPerCell = d_basisOperationsPtr->nDofsPerCell();
+    const unsigned int spinorFactor   = d_dftParamsPtr->noncolin ? 2 : 1;
+    const unsigned int numberWavefunctions = src.numVectors() / spinorFactor;
+    if (d_numVectorsInternal != numberWavefunctions * spinorFactor)
+      reinitNumberWavefunctions(numberWavefunctions * spinorFactor);
 
+    if (d_basisOperationsPtr->d_nVectors != numberWavefunctions * spinorFactor)
+      d_basisOperationsPtr->reinit(numberWavefunctions * spinorFactor,
+                                   d_cellsBlockSizeHX,
+                                   d_densityQuadratureID,
+                                   false,
+                                   false);
+    const bool hasNonlocalComponents =
+      d_dftParamsPtr->isPseudopotential &&
+      (d_ONCVnonLocalOperatorSinglePrec
+         ->getTotalNonLocalElementsInCurrentProcessor() > 0) &&
+      !onlyHPrimePartForFirstOrderDensityMatResponse;
+    const dataTypes::numberFP32 scalarCoeffAlpha = dataTypes::numberFP32(1.0),
+                                scalarCoeffBeta  = dataTypes::numberFP32(0.0);
+
+    if (!skip1 && !skip2 && !skip3)
+      src.updateGhostValues();
+    if (!skip1)
+      {
+        d_basisOperationsPtr
+          ->d_constraintInfo[d_basisOperationsPtr->d_dofHandlerID]
+          .distribute(src);
+        if constexpr (memorySpace == dftfe::utils::MemorySpace::HOST)
+          if (d_dftParamsPtr->isPseudopotential)
+            d_ONCVnonLocalOperatorSinglePrec->initialiseOperatorActionOnX(
+              d_kPointIndex);
+        for (unsigned int iCell = 0; iCell < numCells;
+             iCell += d_cellsBlockSizeHX)
+          {
+            std::pair<unsigned int, unsigned int> cellRange(
+              iCell, std::min(iCell + d_cellsBlockSizeHX, numCells));
+            d_BLASWrapperPtr->stridedCopyToBlock(
+              numberWavefunctions * spinorFactor,
+              numDoFsPerCell * (cellRange.second - cellRange.first),
+              src.data(),
+              d_cellWaveFunctionMatrixSrcSinglePrec.data() +
+                cellRange.first * numDoFsPerCell * numberWavefunctions *
+                  spinorFactor,
+              d_basisOperationsPtr->d_flattenedCellDofIndexToProcessDofIndexMap
+                  .data() +
+                cellRange.first * numDoFsPerCell);
+            if (hasNonlocalComponents)
+              d_ONCVnonLocalOperatorSinglePrec->applyCconjtransOnX(
+                d_cellWaveFunctionMatrixSrcSinglePrec.data() +
+                  cellRange.first * numDoFsPerCell * numberWavefunctions *
+                    spinorFactor,
+                cellRange);
+          }
+      }
+    if (!skip2)
+      {
+        if (d_dftParamsPtr->isPseudopotential &&
+            !onlyHPrimePartForFirstOrderDensityMatResponse)
+          {
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec.setValue(0);
+            d_ONCVnonLocalOperatorSinglePrec->applyAllReduceOnCconjtransX(
+              d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec, true);
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
+              .accumulateAddLocallyOwnedBegin();
+          }
+        src.zeroOutGhosts();
+        inverseMassVectorScaledConstraintsNoneDataInfoPtr->set_zero(src);
+        if (d_dftParamsPtr->isPseudopotential &&
+            !onlyHPrimePartForFirstOrderDensityMatResponse)
+          {
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
+              .accumulateAddLocallyOwnedEnd();
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
+              .updateGhostValuesBegin();
+          }
+        d_BLASWrapperPtr->axpby(src.locallyOwnedSize() * src.numVectors(),
+                                scalarX,
+                                src.data(),
+                                scalarY,
+                                dst.data());
+        if (d_dftParamsPtr->isPseudopotential &&
+            !onlyHPrimePartForFirstOrderDensityMatResponse)
+          {
+            d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
+              .updateGhostValuesEnd();
+            d_ONCVnonLocalOperatorSinglePrec->applyVOnCconjtransX(
+              CouplingStructure::diagonal,
+              d_oncvClassPtr->getCouplingMatrixSinglePrec(),
+              d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec,
+              true);
+          }
+      }
+    if (!skip3)
+      {
+        for (unsigned int iCell = 0; iCell < numCells;
+             iCell += d_cellsBlockSizeHX)
+          {
+            std::pair<unsigned int, unsigned int> cellRange(
+              iCell, std::min(iCell + d_cellsBlockSizeHX, numCells));
+
+            d_BLASWrapperPtr->xgemmStridedBatched(
+              'N',
+              'N',
+              numberWavefunctions,
+              numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor,
+              &scalarCoeffAlpha,
+              d_cellWaveFunctionMatrixSrcSinglePrec.data() +
+                cellRange.first * numDoFsPerCell * spinorFactor *
+                  numberWavefunctions,
+              numberWavefunctions,
+              numDoFsPerCell * spinorFactor * numberWavefunctions,
+              d_cellHamiltonianMatrixSinglePrec[d_HamiltonianIndex].data() +
+                cellRange.first * numDoFsPerCell * spinorFactor *
+                  numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor,
+              numDoFsPerCell * spinorFactor * numDoFsPerCell * spinorFactor,
+              &scalarCoeffBeta,
+              d_cellWaveFunctionMatrixDstSinglePrec.data(),
+              numberWavefunctions,
+              numDoFsPerCell * spinorFactor * numberWavefunctions,
+              cellRange.second - cellRange.first);
+            if (hasNonlocalComponents)
+              d_ONCVnonLocalOperatorSinglePrec->applyCOnVCconjtransX(
+                d_cellWaveFunctionMatrixDstSinglePrec.data(), cellRange);
+            d_BLASWrapperPtr->axpyStridedBlockAtomicAdd(
+              numberWavefunctions * spinorFactor,
+              numDoFsPerCell * (cellRange.second - cellRange.first),
+              scalarHX,
+              d_basisOperationsPtr->cellInverseMassVectorBasisData().data() +
+                cellRange.first * numDoFsPerCell,
+              d_cellWaveFunctionMatrixDstSinglePrec.data(),
+              dst.data(),
+              d_basisOperationsPtr->d_flattenedCellDofIndexToProcessDofIndexMap
+                  .data() +
+                cellRange.first * numDoFsPerCell);
+          }
+
+        inverseMassVectorScaledConstraintsNoneDataInfoPtr
+          ->distribute_slave_to_master(dst);
+      }
+    if (!skip1 && !skip2 && !skip3)
+      {
+        dst.accumulateAddLocallyOwned();
+        dst.zeroOutGhosts();
+      }
+  }
 
 
   template class KohnShamHamiltonianOperator<dftfe::utils::MemorySpace::HOST>;

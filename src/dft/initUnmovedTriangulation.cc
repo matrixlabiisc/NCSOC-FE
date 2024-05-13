@@ -307,7 +307,10 @@ namespace dftfe
 
 
     d_excManagerPtr->init(d_dftParamsPtr->xc_id,
-                          (d_dftParamsPtr->spinPolarized == 1) ? true : false,
+                          ((d_dftParamsPtr->spinPolarized == 1) ||
+                           d_dftParamsPtr->noncolin) ?
+                            true :
+                            false,
                           0.0,   // exx factor
                           false, // scale exchange
                           1.0,   // scale exchange factor

@@ -270,7 +270,7 @@ namespace dftfe
     if (d_verbosity > 0)
       if (d_adaptMixingParameter[mixingVariable::magZ])
         pcout << "Adaptive Anderson mixing parameter for magZ: "
-              << d_mixingParameter[mixingVariable::rho] << std::endl;
+              << d_mixingParameter[mixingVariable::magZ] << std::endl;
       else
         pcout << "Anderson mixing parameter for magZ: "
               << d_mixingParameter[mixingVariable::magZ] << std::endl;

@@ -40,8 +40,12 @@ namespace dftfe
     d_matrixFreeDataPRefined.initialize_dof_vector(
       d_phiExt, d_phiExtDofHandlerIndexElectro);
 
-    d_densityInNodalValues.resize(d_dftParamsPtr->spinPolarized == 1 ? 2 : 1);
-    d_densityOutNodalValues.resize(d_dftParamsPtr->spinPolarized == 1 ? 2 : 1);
+    d_densityInNodalValues.resize(
+      d_dftParamsPtr->noncolin ? 4 :
+                                 (d_dftParamsPtr->spinPolarized == 1 ? 2 : 1));
+    d_densityOutNodalValues.resize(
+      d_dftParamsPtr->noncolin ? 4 :
+                                 (d_dftParamsPtr->spinPolarized == 1 ? 2 : 1));
 
     d_matrixFreeDataPRefined.initialize_dof_vector(
       d_densityInNodalValues[0], d_densityDofHandlerIndexElectro);
@@ -96,8 +100,8 @@ namespace dftfe
     //
 
     AssertThrow(
-      (1 + d_dftParamsPtr->spinPolarized) * d_kPointWeights.size() *
-          d_numEigenValues <
+      (d_dftParamsPtr->noncolin ? 2 : 1) * (1 + d_dftParamsPtr->spinPolarized) *
+          d_kPointWeights.size() * d_numEigenValues <
         INT_MAX / matrix_free_data.get_vector_partitioner()->local_size(),
       dealii::ExcMessage(
         "DFT-FE error: size of local wavefunctions storage exceeds integer bounds. Please increase number of MPI tasks"));
@@ -105,7 +109,8 @@ namespace dftfe
     d_eigenVectorsFlattenedHost.resize(
       (d_numEigenValues *
        matrix_free_data.get_vector_partitioner()->local_size()) *
-        (1 + d_dftParamsPtr->spinPolarized) * d_kPointWeights.size(),
+        (1 + d_dftParamsPtr->spinPolarized) * d_kPointWeights.size() *
+        (d_dftParamsPtr->noncolin ? 2 : 1),
       dataTypes::number(0.0));
     if (d_numEigenValuesRR != d_numEigenValues)
       {
@@ -169,6 +174,11 @@ namespace dftfe
       pcout << std::endl
             << "net magnetization: "
             << totalMagnetization(d_densityInQuadValues[1]) << std::endl;
+    if (d_dftParamsPtr->verbosity >= 2 && d_dftParamsPtr->noncolin)
+      pcout << std::endl
+            << "net magnetization: "
+            << totalNonCollinearMagnetization(d_densityInQuadValues)
+            << std::endl;
   }
 #include "dft.inst.cc"
 } // namespace dftfe

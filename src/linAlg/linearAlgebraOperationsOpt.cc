@@ -103,6 +103,129 @@ namespace dftfe
     }
 
 
+    //
+    // chebyshev filtering of given subspace XArray
+    //
+    template <typename T, typename TFP32, dftfe::utils::MemorySpace memorySpace>
+    void
+    chebyshevFilterSinglePrec(
+      const std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
+        &                                                    BLASWrapperPtr,
+      operatorDFTClass<memorySpace> &                        operatorMatrix,
+      dftfe::linearAlgebra::MultiVector<T, memorySpace> &    X,
+      dftfe::linearAlgebra::MultiVector<T, memorySpace> &    Y,
+      dftfe::linearAlgebra::MultiVector<TFP32, memorySpace> &X_SP,
+      dftfe::linearAlgebra::MultiVector<TFP32, memorySpace> &Y_SP,
+      std::vector<double>                                    eigenvalues,
+      const unsigned int                                     m,
+      const double                                           a,
+      const double                                           b,
+      const double                                           a0)
+    {
+      double e, c, sigma, sigma1, sigma2, gamma;
+      e                               = (b - a) / 2.0;
+      c                               = (b + a) / 2.0;
+      sigma                           = e / (a0 - c);
+      sigma1                          = sigma;
+      gamma                           = 2.0 / sigma1;
+      const unsigned int spinorFactor = X.numVectors() / eigenvalues.size();
+      dftfe::utils::MemoryStorage<double, memorySpace> eigenValuesFiltered,
+        eigenValuesFiltered1, eigenValuesFiltered2;
+      eigenValuesFiltered.resize(eigenvalues.size());
+      eigenValuesFiltered.copyFrom(eigenvalues);
+      eigenValuesFiltered1 = eigenValuesFiltered;
+      eigenValuesFiltered2 = eigenValuesFiltered;
+      eigenValuesFiltered1.setValue(1.0);
+      //
+      // create YArray
+      // initialize to zeros.
+      // x
+      operatorMatrix.HXCheby(X, 1.0, 0.0, 0.0, Y);
+      // Y=HX
+      //
+      // call HX
+      //
+      double alpha1 = sigma1 / e, alpha2 = -c;
+      // Y=alpha1*HX+alpha1 * alpha2*X
+      eigenValuesFiltered2.setValue(alpha1 * alpha2);
+      BLASWrapperPtr->ApaBD(1,
+                            eigenValuesFiltered2.size(),
+                            alpha1,
+                            eigenValuesFiltered2.data(),
+                            eigenValuesFiltered1.data(),
+                            eigenValuesFiltered.data(),
+                            eigenValuesFiltered2.data());
+      BLASWrapperPtr->ApaBD(X.locallyOwnedSize() * spinorFactor,
+                            X.numVectors() / spinorFactor,
+                            -1.0,
+                            Y.data(),
+                            X.data(),
+                            eigenValuesFiltered.data(),
+                            Y.data());
+      X_SP.setValue(0.0);
+      BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
+        X.locallyOwnedSize() * X.numVectors(), Y.data(), Y_SP.data());
+      BLASWrapperPtr->xscal(Y_SP.data(),
+                            dataTypes::numberFP32(alpha1),
+                            X.locallyOwnedSize() * X.numVectors());
+      //
+      // polynomial loop
+      //
+      for (unsigned int degree = 2; degree < m + 1; ++degree)
+        {
+          sigma2 = 1.0 / (gamma - sigma);
+          alpha1 = 2.0 * sigma2 / e, alpha2 = -(sigma * sigma2);
+
+
+          operatorMatrix.HXCheby(Y_SP, alpha1, alpha2, -c * alpha1, X_SP);
+          BLASWrapperPtr->ApaBD(X.locallyOwnedSize() * spinorFactor,
+                                X.numVectors() / spinorFactor,
+                                alpha1,
+                                X_SP.data(),
+                                Y.data(),
+                                eigenValuesFiltered2.data(),
+                                X_SP.data());
+
+          //
+          // call HX
+          //
+          // operatorMatrix.HXCheby(
+          //   Y, X, Y, eigenValuesFiltered2, alpha1, alpha2, -c * alpha1, X);
+          BLASWrapperPtr->axpby(eigenValuesFiltered2.size(),
+                                -c * alpha1,
+                                eigenValuesFiltered2.data(),
+                                alpha2,
+                                eigenValuesFiltered1.data());
+          BLASWrapperPtr->ApaBD(1,
+                                eigenValuesFiltered1.size(),
+                                alpha1,
+                                eigenValuesFiltered1.data(),
+                                eigenValuesFiltered2.data(),
+                                eigenValuesFiltered.data(),
+                                eigenValuesFiltered1.data());
+
+
+          //
+          // XArray = YArray
+          //
+          X_SP.swap(Y_SP);
+          eigenValuesFiltered1.swap(eigenValuesFiltered2);
+
+          //
+          // YArray = YNewArray
+          //
+          sigma = sigma2;
+        }
+      BLASWrapperPtr->ApaBD(X.locallyOwnedSize() * spinorFactor,
+                            X.numVectors() / spinorFactor,
+                            1.0,
+                            Y_SP.data(),
+                            X.data(),
+                            eigenValuesFiltered2.data(),
+                            X.data());
+
+      // copy back YArray to XArray
+    }
 
     //
     // evaluate upper bound of the spectrum using k-step Lanczos iteration
@@ -311,6 +434,7 @@ namespace dftfe
       const unsigned int this_mpi_process =
         dealii::Utilities::MPI::this_mpi_process(
           operatorMatrix.getMPICommunicatorDomain());
+      const unsigned int spinorFactor = dftParams.noncolin ? 2 : 1;
 
       const unsigned int lanczosIterations =
         dftParams.reproducible_output ? 200 : 50;
@@ -326,7 +450,7 @@ namespace dftfe
       Y.setValue(T(0.0));
       Z.setValue(T(0.0));
       tempVec.setValue(T(0.0));
-      const unsigned int local_size = X.locallyOwnedSize();
+      const unsigned int local_size = X.locallyOwnedSize() * spinorFactor;
 #if defined(DFTFE_WITH_DEVICE)
       dftfe::utils::MemoryStorage<T, dftfe::utils::MemorySpace::HOST> XHost(
         local_size, T(0.0));
@@ -402,11 +526,11 @@ namespace dftfe
             local_size, 1.0 / beta, Y.data(), 0.0, X.data());
 
           operatorMatrix.HXCheby(X, 1.0, 0.0, 0.0, Y);
+          operatorMatrix.overlapMatrixTimesX(Y, 1.0, 0.0, 0.0, tempVec, true);
 
           alphaNeg = -beta;
           BLASWrapperPtr->xaxpy(
             local_size, &alphaNeg, Z.data(), 1, Y.data(), 1);
-          operatorMatrix.HX(X, 1.0, 0.0, 0.0, tempVec);
           BLASWrapperPtr->xdot(local_size,
                                tempVec.data(),
                                1,
@@ -573,6 +697,26 @@ namespace dftfe
       const double,
       const double,
       const double);
+    template void
+    chebyshevFilterSinglePrec(
+      const std::shared_ptr<
+        dftfe::linearAlgebra::BLASWrapper<dftfe::utils::MemorySpace::HOST>>
+        &                                                BLASWrapperPtr,
+      operatorDFTClass<dftfe::utils::MemorySpace::HOST> &operatorMatrix,
+      dftfe::linearAlgebra::MultiVector<dataTypes::number,
+                                        dftfe::utils::MemorySpace::HOST> &X,
+      dftfe::linearAlgebra::MultiVector<dataTypes::number,
+                                        dftfe::utils::MemorySpace::HOST> &Y,
+      dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                        dftfe::utils::MemorySpace::HOST> &X_SP,
+      dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                        dftfe::utils::MemorySpace::HOST> &Y_SP,
+      std::vector<double> eigenvalues,
+      const unsigned int  m,
+      const double        a,
+      const double        b,
+      const double        a0);
+
 #ifdef DFTFE_WITH_DEVICE
     template void
     chebyshevFilter(
@@ -585,6 +729,27 @@ namespace dftfe
       const double,
       const double,
       const double);
+    template void
+    chebyshevFilterSinglePrec(
+      const std::shared_ptr<
+        dftfe::linearAlgebra::BLASWrapper<dftfe::utils::MemorySpace::DEVICE>>
+        &                                                  BLASWrapperPtr,
+      operatorDFTClass<dftfe::utils::MemorySpace::DEVICE> &operatorMatrix,
+      dftfe::linearAlgebra::MultiVector<dataTypes::number,
+                                        dftfe::utils::MemorySpace::DEVICE> &X,
+      dftfe::linearAlgebra::MultiVector<dataTypes::number,
+                                        dftfe::utils::MemorySpace::DEVICE> &Y,
+      dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                        dftfe::utils::MemorySpace::DEVICE>
+        &X_SP,
+      dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                        dftfe::utils::MemorySpace::DEVICE>
+        &                 Y_SP,
+      std::vector<double> eigenvalues,
+      const unsigned int  m,
+      const double        a,
+      const double        b,
+      const double        a0);
 #endif
 
 

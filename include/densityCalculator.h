@@ -75,7 +75,8 @@ namespace dftfe
     double *                                    gradRhoCellsWfcContributions,
     double *                                    rho,
     double *                                    gradRho,
-    const bool                                  isEvaluateGradRho);
+    const bool                                  isEvaluateGradRho,
+    const bool                                  isNonCollin);
 
 #if defined(DFTFE_WITH_DEVICE)
   template <typename NumberType>
@@ -98,7 +99,8 @@ namespace dftfe
     double *                                    gradRhoCellsWfcContributions,
     double *                                    rho,
     double *                                    gradRho,
-    const bool                                  isEvaluateGradRho);
+    const bool                                  isEvaluateGradRho,
+    const bool                                  isNonCollin);
 #endif
 
 } // namespace dftfe

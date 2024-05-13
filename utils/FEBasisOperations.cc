@@ -663,6 +663,34 @@ namespace dftfe
                                            3);
           if (zeroIndexVec.size() != d_cellsBlockSize)
             zeroIndexVec.resize(d_cellsBlockSize, 0);
+          if constexpr (memorySpace == dftfe::utils::MemorySpace::HOST)
+            {
+              dftfe::basis::FEBasisOperationsKernelsInternal::
+                reshapeToNonAffineLayoutHost(
+                  d_nDofsPerCell,
+                  d_nQuadsPerCell[d_quadratureIndex],
+                  1,
+                  shapeFunctionGradientBasisData().data(),
+                  tempCellGradientsBlock.data());
+            }
+          else
+            {
+              dftfe::basis::FEBasisOperationsKernelsInternal::
+                reshapeToNonAffineLayoutDevice(
+                  d_nDofsPerCell,
+                  d_nQuadsPerCell[d_quadratureIndex],
+                  1,
+                  shapeFunctionGradientBasisData().data(),
+                  tempCellGradientsBlock.data());
+            }
+          if (d_cellsBlockSize > 1)
+            d_BLASWrapperPtr->stridedCopyToBlock(
+              d_nQuadsPerCell[d_quadratureIndex] * d_nDofsPerCell * 3,
+              d_cellsBlockSize - 1,
+              tempCellGradientsBlock.data(),
+              tempCellGradientsBlock.data() +
+                d_nQuadsPerCell[d_quadratureIndex] * d_nDofsPerCell * 3,
+              zeroIndexVec.data());
         }
     }
 
@@ -1332,34 +1360,6 @@ namespace dftfe
       d_jacobianFactor.resize(d_jacobianFactorHost.size());
       d_jacobianFactor.copyFrom(d_jacobianFactorHost);
 #endif
-      if constexpr (memorySpace == dftfe::utils::MemorySpace::HOST)
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutHost(
-              d_nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      else
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutDevice(
-              d_nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      if (cellsBlockSize > 1)
-        d_BLASWrapperPtr->stridedCopyToBlock(nQuadsPerCell * d_nDofsPerCell * 3,
-                                             cellsBlockSize - 1,
-                                             tempCellGradientsBlock.data(),
-                                             tempCellGradientsBlock.data() +
-                                               nQuadsPerCell * d_nDofsPerCell *
-                                                 3,
-                                             zeroIndexVec.data());
       const ValueTypeBasisData scalarCoeffAlpha = ValueTypeBasisData(1.0),
                                scalarCoeffBeta  = ValueTypeBasisData(0.0);
 
@@ -1457,17 +1457,12 @@ namespace dftfe
         {
           std::pair<unsigned int, unsigned int> cellRange(
             iCell, std::min(iCell + d_cellsBlockSize, cellRangeTotal.second));
-          d_BLASWrapperPtr->stridedCopyToBlock(nQuadsPerCell * nDofsPerCell,
-                                               (cellRange.second -
-                                                cellRange.first),
-                                               shapeFunctionBasisData().data(),
-                                               tempCellValuesBlock.data(),
-                                               zeroIndexVec.data());
-          d_BLASWrapperPtr->stridedBlockScale(
+          d_BLASWrapperPtr->stridedBlockScaleCopyConstantStride(
             nDofsPerCell,
             nQuadsPerCell * (cellRange.second - cellRange.first),
             scalarCoeffAlpha,
             weights.data() + cellRange.first * nQuadsPerCell,
+            shapeFunctionBasisData().data(),
             tempCellValuesBlock.data());
           d_BLASWrapperPtr->xgemmStridedBatched(
             'N',
@@ -1508,33 +1503,6 @@ namespace dftfe
       const unsigned int nQuadsPerCell = this->nQuadsPerCell();
       const unsigned int nDofsPerCell  = this->nDofsPerCell();
 
-      if constexpr (memorySpace == dftfe::utils::MemorySpace::HOST)
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutHost(
-              nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      else
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutDevice(
-              nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      if (d_cellsBlockSize > 1)
-        d_BLASWrapperPtr->stridedCopyToBlock(nQuadsPerCell * nDofsPerCell * 3,
-                                             d_cellsBlockSize - 1,
-                                             tempCellGradientsBlock.data(),
-                                             tempCellGradientsBlock.data() +
-                                               nQuadsPerCell * nDofsPerCell * 3,
-                                             zeroIndexVec.data());
       const ValueTypeBasisData scalarCoeffAlpha = ValueTypeBasisData(1.0),
                                scalarCoeffBeta  = ValueTypeBasisData(0.0);
 
@@ -1600,33 +1568,6 @@ namespace dftfe
       const unsigned int nQuadsPerCell = this->nQuadsPerCell();
       const unsigned int nDofsPerCell  = this->nDofsPerCell();
 
-      if constexpr (memorySpace == dftfe::utils::MemorySpace::HOST)
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutHost(
-              nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      else
-        {
-          dftfe::basis::FEBasisOperationsKernelsInternal::
-            reshapeToNonAffineLayoutDevice(
-              nDofsPerCell,
-              nQuadsPerCell,
-              1,
-              shapeFunctionGradientBasisData().data(),
-              tempCellGradientsBlock.data());
-        }
-      if (d_cellsBlockSize > 1)
-        d_BLASWrapperPtr->stridedCopyToBlock(nQuadsPerCell * nDofsPerCell * 3,
-                                             d_cellsBlockSize - 1,
-                                             tempCellGradientsBlock.data(),
-                                             tempCellGradientsBlock.data() +
-                                               nQuadsPerCell * nDofsPerCell * 3,
-                                             zeroIndexVec.data());
       const ValueTypeBasisData scalarCoeffAlpha = ValueTypeBasisData(1.0),
                                scalarCoeffBeta  = ValueTypeBasisData(0.0);
 
@@ -2125,9 +2066,42 @@ namespace dftfe
               dftfe::utils::MemorySpace memorySpace>
     void
     FEBasisOperations<ValueTypeBasisCoeff, ValueTypeBasisData, memorySpace>::
+      createScratchMultiVectorsSinglePrec(const unsigned int vecBlockSize,
+                                          const unsigned int numMultiVecs) const
+    {
+      auto iter = scratchMultiVectorsSinglePrec.find(vecBlockSize);
+      if (iter == scratchMultiVectorsSinglePrec.end())
+        {
+          scratchMultiVectorsSinglePrec[vecBlockSize] =
+            std::vector<dftfe::linearAlgebra::MultiVector<
+              typename dftfe::dataTypes::singlePrecType<
+                ValueTypeBasisCoeff>::type,
+              memorySpace>>(numMultiVecs);
+          for (unsigned int iVec = 0; iVec < numMultiVecs; ++iVec)
+            scratchMultiVectorsSinglePrec[vecBlockSize][iVec].reinit(
+              mpiPatternP2P, vecBlockSize);
+        }
+      else
+        {
+          scratchMultiVectorsSinglePrec[vecBlockSize].resize(
+            scratchMultiVectorsSinglePrec[vecBlockSize].size() + numMultiVecs);
+          for (unsigned int iVec = 0;
+               iVec < scratchMultiVectorsSinglePrec[vecBlockSize].size();
+               ++iVec)
+            scratchMultiVectorsSinglePrec[vecBlockSize][iVec].reinit(
+              mpiPatternP2P, vecBlockSize);
+        }
+    }
+
+    template <typename ValueTypeBasisCoeff,
+              typename ValueTypeBasisData,
+              dftfe::utils::MemorySpace memorySpace>
+    void
+    FEBasisOperations<ValueTypeBasisCoeff, ValueTypeBasisData, memorySpace>::
       clearScratchMultiVectors() const
     {
       scratchMultiVectors.clear();
+      scratchMultiVectorsSinglePrec.clear();
     }
 
     template <typename ValueTypeBasisCoeff,
@@ -2143,6 +2117,23 @@ namespace dftfe
                   dealii::ExcMessage(
                     "DFT-FE Error: MultiVector not found in scratch storage."));
       return scratchMultiVectors[vecBlockSize][index];
+    }
+
+    template <typename ValueTypeBasisCoeff,
+              typename ValueTypeBasisData,
+              dftfe::utils::MemorySpace memorySpace>
+    dftfe::linearAlgebra::MultiVector<
+      typename dftfe::dataTypes::singlePrecType<ValueTypeBasisCoeff>::type,
+      memorySpace> &
+    FEBasisOperations<ValueTypeBasisCoeff, ValueTypeBasisData, memorySpace>::
+      getMultiVectorSinglePrec(const unsigned int vecBlockSize,
+                               const unsigned int index) const
+    {
+      AssertThrow(scratchMultiVectorsSinglePrec.find(vecBlockSize) !=
+                    scratchMultiVectorsSinglePrec.end(),
+                  dealii::ExcMessage(
+                    "DFT-FE Error: MultiVector not found in scratch storage."));
+      return scratchMultiVectorsSinglePrec[vecBlockSize][index];
     }
 
 

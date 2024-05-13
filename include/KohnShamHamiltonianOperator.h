@@ -78,6 +78,11 @@ namespace dftfe
                             const unsigned int index);
 
 
+    dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace> &
+    getScratchFEMultivectorSinglePrec(const unsigned int numVectors,
+                                      const unsigned int index);
+
+
     /**
      * @brief Computes effective potential involving exchange-correlation functionals
      * @param rhoValues electron-density
@@ -178,6 +183,19 @@ namespace dftfe
       const bool skip3                                         = false);
 
     void
+    HXCheby(dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                              memorySpace> &src,
+            const double                                    scalarHX,
+            const double                                    scalarY,
+            const double                                    scalarX,
+            dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32,
+                                              memorySpace> &dst,
+            const bool onlyHPrimePartForFirstOrderDensityMatResponse,
+            const bool skip1,
+            const bool skip2,
+            const bool skip3);
+
+    void
     HXRR(
       dftfe::linearAlgebra::MultiVector<dataTypes::number, memorySpace> &src,
       dftfe::linearAlgebra::MultiVector<dataTypes::number, memorySpace> &dstHX,
@@ -188,6 +206,10 @@ namespace dftfe
     std::shared_ptr<
       AtomicCenteredNonLocalOperator<dataTypes::number, memorySpace>>
       d_ONCVnonLocalOperator;
+
+    std::shared_ptr<
+      AtomicCenteredNonLocalOperator<dataTypes::numberFP32, memorySpace>>
+      d_ONCVnonLocalOperatorSinglePrec;
 
     std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
       d_BLASWrapperPtr;
@@ -206,6 +228,8 @@ namespace dftfe
 
     std::vector<dftfe::utils::MemoryStorage<dataTypes::number, memorySpace>>
       d_cellHamiltonianMatrix;
+    std::vector<dftfe::utils::MemoryStorage<dataTypes::numberFP32, memorySpace>>
+      d_cellHamiltonianMatrixSinglePrec;
     dftfe::utils::MemoryStorage<double, memorySpace>
       d_cellHamiltonianMatrixExtPot;
 
@@ -215,13 +239,24 @@ namespace dftfe
     dftfe::utils::MemoryStorage<dataTypes::number, memorySpace>
       d_cellWaveFunctionMatrixDst;
 
+    dftfe::utils::MemoryStorage<dataTypes::numberFP32, memorySpace>
+      d_cellWaveFunctionMatrixSrcSinglePrec;
+    dftfe::utils::MemoryStorage<dataTypes::numberFP32, memorySpace>
+      d_cellWaveFunctionMatrixDstSinglePrec;
+
     dftfe::linearAlgebra::MultiVector<dataTypes::number, memorySpace>
-                                                     d_ONCVNonLocalProjectorTimesVectorBlock;
-    dftfe::utils::MemoryStorage<double, memorySpace> d_VeffJxW;
+      d_ONCVNonLocalProjectorTimesVectorBlock;
+    dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace>
+                                                     d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec;
+    dftfe::utils::MemoryStorage<double, memorySpace> d_VeffJxW, d_BeffxJxW,
+      d_BeffyJxW, d_BeffzJxW;
     dftfe::utils::MemoryStorage<double, memorySpace> d_VeffExtPotJxW;
 
     dftfe::utils::MemoryStorage<double, memorySpace>
-      d_invJacderExcWithSigmaTimesGradRhoJxW;
+      d_invJacderExcWithSigmaTimesGradRhoJxW,
+      d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW,
+      d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW,
+      d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW;
     std::vector<dftfe::utils::MemoryStorage<double, memorySpace>>
       d_invJacKPointTimesJxW;
     // Constraints scaled with inverse sqrt diagonal Mass Matrix
@@ -236,6 +271,13 @@ namespace dftfe
 
     dftfe::utils::MemoryStorage<double, memorySpace> tempHamMatrixRealBlock;
     dftfe::utils::MemoryStorage<double, memorySpace> tempHamMatrixImagBlock;
+
+    dftfe::utils::MemoryStorage<double, memorySpace>
+      tempHamMatrixBXBlockNonCollin;
+    dftfe::utils::MemoryStorage<double, memorySpace>
+      tempHamMatrixBYBlockNonCollin;
+    dftfe::utils::MemoryStorage<double, memorySpace>
+      tempHamMatrixBZBlockNonCollin;
 
     const unsigned int         d_densityQuadratureID;
     const unsigned int         d_lpspQuadratureID;
@@ -255,6 +297,26 @@ namespace dftfe
 
     // compute-time logger
     dealii::TimerOutput computing_timer;
+  };
+  namespace internal
+  {
+    template <dftfe::utils::MemorySpace memorySpace>
+    void
+    computeCellHamiltonianMatrixNonCollinearFromBlocks(
+      const std::pair<unsigned int, unsigned int> cellRange,
+      const unsigned int                          nDofsPerCell,
+      const dftfe::utils::MemoryStorage<double, memorySpace>
+        &tempHamMatrixRealBlock,
+      const dftfe::utils::MemoryStorage<double, memorySpace>
+        &tempHamMatrixImagBlock,
+      const dftfe::utils::MemoryStorage<double, memorySpace>
+        &tempHamMatrixBZBlockNonCollin,
+      const dftfe::utils::MemoryStorage<double, memorySpace>
+        &tempHamMatrixBYBlockNonCollin,
+      const dftfe::utils::MemoryStorage<double, memorySpace>
+        &tempHamMatrixBXBlockNonCollin,
+      dftfe::utils::MemoryStorage<std::complex<double>, memorySpace>
+        &cellHamiltonianMatrix);
   };
 } // namespace dftfe
 #endif

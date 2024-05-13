@@ -3436,6 +3436,7 @@ namespace dftfe
       //
       // Get access to number of locally owned nodes on the current processor
       //
+      const unsigned int spinorFactor = dftParams.noncolin ? 2 : 1;
 
       // create temporary arrays XBlock,Hx
       distributedCPUMultiVec<dataTypes::number> *XBlock, *HXBlock;
@@ -3504,7 +3505,7 @@ namespace dftfe
             {
               XBlock  = &operatorMatrix.getScratchFEMultivector(B, 0);
               HXBlock = &operatorMatrix.getScratchFEMultivector(B, 1);
-              HXBlockSinglePrec.resize(B * numberDofs);
+              HXBlockSinglePrec.resize(B * spinorFactor * numberDofs);
             }
 
           if ((jvec + B) <=
@@ -3677,6 +3678,7 @@ namespace dftfe
       //
       // Get access to number of locally owned nodes on the current processor
       //
+      const unsigned int spinorFactor = dftParams.noncolin ? 2 : 1;
 
       // create temporary arrays XBlock,Hx
       distributedCPUMultiVec<dataTypes::number> *XBlock, *OXBlock;
@@ -3746,7 +3748,7 @@ namespace dftfe
             {
               XBlock  = &operatorMatrix.getScratchFEMultivector(B, 0);
               OXBlock = &operatorMatrix.getScratchFEMultivector(B, 1);
-              OXBlockSinglePrec.resize(B * numberDofs);
+              OXBlockSinglePrec.resize(B * spinorFactor * numberDofs);
             }
 
           if ((jvec + B) <=

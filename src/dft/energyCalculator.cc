@@ -213,7 +213,8 @@ namespace dftfe
                     const dftParameters &                   dftParams)
     {
       double       bandEnergyLocal = 0.0;
-      unsigned int numEigenValues = eigenValues[0].size() / (1 + spinPolarized);
+      unsigned int numEigenValues =
+        eigenValues[0].size() / (spinPolarized == 1 ? 2 : 1);
       //
       for (unsigned int ipool = 0;
            ipool < dealii::Utilities::MPI::n_mpi_processes(interpoolcomm);
@@ -283,6 +284,21 @@ namespace dftfe
                                   << eigenValues[kPoint][i + numEigenValues]
                                   << "       " << partialOccupancy << "       "
                                   << partialOccupancy2 << std::endl;
+                        }
+                      if (spinPolarized == 2)
+                        {
+                          const double partialOccupancy =
+                            dftUtils::getPartialOccupancy(
+                              eigenValues[kPoint][i], fermiEnergy, C_kb, TVal);
+                          bandEnergyLocal += partialOccupancy *
+                                             kPointWeights[kPoint] *
+                                             eigenValues[kPoint][i];
+                          //
+
+                          if (verbosity > 1)
+                            scout << i << " : " << eigenValues[kPoint][i]
+                                  << "       " << partialOccupancy << std::endl;
+                          //
                         }
                     } // eigen state
                   //
@@ -492,7 +508,9 @@ namespace dftfe
                                 fermiEnergyUp,
                                 fermiEnergyDown,
                                 d_dftParams.TVal,
-                                d_dftParams.spinPolarized,
+                                d_dftParams.noncolin ?
+                                  2 :
+                                  d_dftParams.spinPolarized,
                                 scout,
                                 interpoolcomm,
                                 lowerBoundKindex,
@@ -539,6 +557,19 @@ namespace dftfe
                                         exchangeEnergy,
                                         correlationEnergy,
                                         excCorrPotentialTimesRho);
+    else if (d_dftParams.noncolin)
+      computeXCEnergyTermsNonCollinear(basisOperationsPtr,
+                                       densityQuadratureID,
+                                       excManagerPtr,
+                                       densityInValues,
+                                       densityOutValues,
+                                       gradDensityInValues,
+                                       gradDensityOutValues,
+                                       rhoCoreValues,
+                                       gradRhoCoreValues,
+                                       exchangeEnergy,
+                                       correlationEnergy,
+                                       excCorrPotentialTimesRho);
     else
       computeXCEnergyTerms(basisOperationsPtr,
                            densityQuadratureID,
@@ -584,7 +615,6 @@ namespace dftfe
       dealii::Utilities::MPI::sum(electrostaticEnergyTotPot, mpi_communicator);
     double totalNuclearElectrostaticEnergy =
       dealii::Utilities::MPI::sum(nuclearElectrostaticEnergy, mpi_communicator);
-
     double d_energyDispersion = 0;
     if (d_dftParams.dc_dispersioncorrectiontype != 0)
       {
@@ -605,6 +635,18 @@ namespace dftfe
 
 
     double totalkineticEnergy = -totalpotentialTimesRho + bandEnergy;
+    {
+      double totalExcCorrPotentialTimesRho =
+        dealii::Utilities::MPI::sum(excCorrPotentialTimesRho, mpi_communicator);
+      double totalElectrostaticPotentialTimesRho =
+        dealii::Utilities::MPI::sum(electrostaticPotentialTimesRho,
+                                    mpi_communicator);
+      pcout << "DEBUG vtxc " << totalExcCorrPotentialTimesRho << std::endl;
+      pcout << "DEBUG vel " << totalElectrostaticPotentialTimesRho << std::endl;
+      pcout << "DEBUG eel " << allElectronElectrostaticEnergy << std::endl;
+      pcout << "DEBUG ke " << totalkineticEnergy << std::endl;
+      pcout << "DEBUG vt " << totalpotentialTimesRho << std::endl;
+    }
 
     // output
     if (print)
@@ -847,8 +889,328 @@ namespace dftfe
                   derCorrEnergyWithInputDensity[2 * iQuad + 1];
             excCorrPotentialTimesRho +=
               Vxc *
-              ((densityInValues[0][iCell * nQuadsPerCell + iQuad] -
-                densityInValues[1][iCell * nQuadsPerCell + iQuad]) /
+              ((densityOutValues[0][iCell * nQuadsPerCell + iQuad] -
+                densityOutValues[1][iCell * nQuadsPerCell + iQuad]) /
+               2.0) *
+              basisOperationsPtr->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
+            exchangeEnergy +=
+              (exchangeEnergyDensity[iQuad]) *
+              (densityValueOutXC[2 * iQuad] +
+               densityValueOutXC[2 * iQuad + 1]) *
+              basisOperationsPtr->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
+
+            correlationEnergy +=
+              (corrEnergyDensity[iQuad]) *
+              (densityValueOutXC[2 * iQuad] +
+               densityValueOutXC[2 * iQuad + 1]) *
+              basisOperationsPtr->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
+            if (excManagerPtr->getDensityBasedFamilyType() ==
+                densityFamilyType::GGA)
+              {
+                double VxcGrad = 0.0;
+                for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                  VxcGrad +=
+                    2.0 *
+                    (derExchEnergyWithSigmaGradDenInput[3 * iQuad + iDim] +
+                     derCorrEnergyWithSigmaGradDenInput[3 * iQuad + iDim]) *
+                    gradXCRhoInDotgradRhoOut[3 * iQuad + iDim];
+                excCorrPotentialTimesRho +=
+                  VxcGrad * basisOperationsPtr
+                              ->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
+              }
+          }
+      }
+  }
+
+  void
+  energyCalculator::computeXCEnergyTermsNonCollinear(
+    const std::shared_ptr<
+      dftfe::basis::FEBasisOperations<dataTypes::number,
+                                      double,
+                                      dftfe::utils::MemorySpace::HOST>>
+      &                               basisOperationsPtr,
+    const unsigned int                quadratureId,
+    const std::shared_ptr<excManager> excManagerPtr,
+    const std::vector<
+      dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>>
+      &densityInValues,
+    const std::vector<
+      dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>>
+      &densityOutValues,
+    const std::vector<
+      dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>>
+      &gradDensityInValues,
+    const std::vector<
+      dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>>
+      &                                                  gradDensityOutValues,
+    const std::map<dealii::CellId, std::vector<double>> &rhoCoreValues,
+    const std::map<dealii::CellId, std::vector<double>> &gradRhoCoreValues,
+    double &                                             exchangeEnergy,
+    double &                                             correlationEnergy,
+    double &excCorrPotentialTimesRho)
+  {
+    basisOperationsPtr->reinit(0, 0, quadratureId, false);
+    const unsigned int  nCells        = basisOperationsPtr->nCells();
+    const unsigned int  nQuadsPerCell = basisOperationsPtr->nQuadsPerCell();
+    std::vector<double> densityValueInXC(2 * nQuadsPerCell, 0.0);
+    std::vector<double> densityValueOutXC(2 * nQuadsPerCell, 0.0);
+    std::vector<double> magInNorm(nQuadsPerCell);
+    std::vector<double> magInAxis(nQuadsPerCell * 3);
+    std::vector<double> magOutNorm(nQuadsPerCell);
+    std::vector<double> magOutAxis(nQuadsPerCell * 3);
+    std::vector<double> exchangeEnergyDensity(nQuadsPerCell, 0.0);
+    std::vector<double> corrEnergyDensity(nQuadsPerCell, 0.0);
+    std::vector<double> derExchEnergyWithInputDensity(2 * nQuadsPerCell, 0.0);
+    std::vector<double> derCorrEnergyWithInputDensity(2 * nQuadsPerCell, 0.0);
+    std::vector<double> derExchEnergyWithSigmaGradDenInput,
+      derCorrEnergyWithSigmaGradDenInput;
+    std::vector<double> sigmaWithOutputGradDensity, sigmaWithInputGradDensity;
+    std::vector<double> gradXCRhoInDotgradRhoOut;
+    std::vector<std::vector<double>> gradRhoIn, gradRhoOut;
+    if (excManagerPtr->getDensityBasedFamilyType() == densityFamilyType::GGA)
+      {
+        derExchEnergyWithSigmaGradDenInput.resize(3 * nQuadsPerCell);
+        derCorrEnergyWithSigmaGradDenInput.resize(3 * nQuadsPerCell);
+        sigmaWithOutputGradDensity.resize(3 * nQuadsPerCell);
+        sigmaWithInputGradDensity.resize(3 * nQuadsPerCell);
+        gradXCRhoInDotgradRhoOut.resize(3 * nQuadsPerCell);
+      }
+    auto dot3 = [](const std::array<double, 3> &a,
+                   const std::array<double, 3> &b) {
+      double sum = 0.0;
+      for (unsigned int i = 0; i < 3; i++)
+        {
+          sum += a[i] * b[i];
+        }
+      return sum;
+    };
+    const std::vector<double> dummy;
+    for (unsigned int iCell = 0; iCell < nCells; ++iCell)
+      {
+        auto cellId = basisOperationsPtr->cellID(iCell);
+        std::map<rhoDataAttributes, const std::vector<double> *> rhoOutData;
+        std::map<rhoDataAttributes, const std::vector<double> *> rhoInData;
+
+        std::map<VeffOutputDataAttributes, std::vector<double> *>
+          outputDerExchangeEnergy;
+        std::map<VeffOutputDataAttributes, std::vector<double> *>
+                                   outputDerCorrEnergy;
+        const std::vector<double> &tempRhoCore =
+          d_dftParams.nonLinearCoreCorrection ?
+            rhoCoreValues.find(cellId)->second :
+            dummy;
+        const std::vector<double> &tempGradRhoCore =
+          (d_dftParams.nonLinearCoreCorrection &&
+           excManagerPtr->getDensityBasedFamilyType() ==
+             densityFamilyType::GGA) ?
+            gradRhoCoreValues.find(cellId)->second :
+            dummy;
+        const double *cellRhoInValues =
+          densityInValues[0].data() + iCell * nQuadsPerCell;
+        const double *cellMagZInValues =
+          densityInValues[1].data() + iCell * nQuadsPerCell;
+        const double *cellMagYInValues =
+          densityInValues[2].data() + iCell * nQuadsPerCell;
+        const double *cellMagXInValues =
+          densityInValues[3].data() + iCell * nQuadsPerCell;
+        const double *cellRhoOutValues =
+          densityOutValues[0].data() + iCell * nQuadsPerCell;
+        const double *cellMagZOutValues =
+          densityOutValues[1].data() + iCell * nQuadsPerCell;
+        const double *cellMagYOutValues =
+          densityOutValues[2].data() + iCell * nQuadsPerCell;
+        const double *cellMagXOutValues =
+          densityOutValues[3].data() + iCell * nQuadsPerCell;
+        for (unsigned int iQuad = 0; iQuad < nQuadsPerCell; ++iQuad)
+          {
+            magInNorm[iQuad] =
+              std::sqrt(cellMagZInValues[iQuad] * cellMagZInValues[iQuad] +
+                        cellMagYInValues[iQuad] * cellMagYInValues[iQuad] +
+                        cellMagXInValues[iQuad] * cellMagXInValues[iQuad]);
+            if (magInNorm[iQuad] > 1e-12)
+              {
+                magInAxis[3 * iQuad + 0] =
+                  cellMagXInValues[iQuad] / magInNorm[iQuad];
+                magInAxis[3 * iQuad + 1] =
+                  cellMagYInValues[iQuad] / magInNorm[iQuad];
+                magInAxis[3 * iQuad + 2] =
+                  cellMagZInValues[iQuad] / magInNorm[iQuad];
+              }
+            else
+              {
+                magInAxis[3 * iQuad + 0] = 0.0;
+                magInAxis[3 * iQuad + 1] = 0.0;
+                magInAxis[3 * iQuad + 2] = 0.0;
+              }
+            const double rhoInByTwo = cellRhoInValues[iQuad] / 2.0;
+            const double magInByTwo = magInNorm[iQuad] / 2.0;
+            magOutNorm[iQuad] =
+              std::sqrt(cellMagZOutValues[iQuad] * cellMagZOutValues[iQuad] +
+                        cellMagYOutValues[iQuad] * cellMagYOutValues[iQuad] +
+                        cellMagXOutValues[iQuad] * cellMagXOutValues[iQuad]);
+            if (magOutNorm[iQuad] > 1e-12)
+              {
+                magOutAxis[3 * iQuad + 0] =
+                  cellMagXOutValues[iQuad] / magOutNorm[iQuad];
+                magOutAxis[3 * iQuad + 1] =
+                  cellMagYOutValues[iQuad] / magOutNorm[iQuad];
+                magOutAxis[3 * iQuad + 2] =
+                  cellMagZOutValues[iQuad] / magOutNorm[iQuad];
+              }
+            else
+              {
+                magOutAxis[3 * iQuad + 0] = 0.0;
+                magOutAxis[3 * iQuad + 1] = 0.0;
+                magOutAxis[3 * iQuad + 2] = 0.0;
+              }
+            const double rhoOutByTwo = cellRhoOutValues[iQuad] / 2.0;
+            const double magOutByTwo = magOutNorm[iQuad] / 2.0;
+
+            densityValueInXC[2 * iQuad + 0]  = rhoInByTwo + magInByTwo;
+            densityValueInXC[2 * iQuad + 1]  = rhoInByTwo - magInByTwo;
+            densityValueOutXC[2 * iQuad + 0] = rhoOutByTwo + magOutByTwo;
+            densityValueOutXC[2 * iQuad + 1] = rhoOutByTwo - magOutByTwo;
+            if (d_dftParams.nonLinearCoreCorrection == true)
+              {
+                densityValueInXC[2 * iQuad + 0] += tempRhoCore[iQuad] / 2.0;
+                densityValueInXC[2 * iQuad + 1] += tempRhoCore[iQuad] / 2.0;
+                densityValueOutXC[2 * iQuad + 0] += tempRhoCore[iQuad] / 2.0;
+                densityValueOutXC[2 * iQuad + 1] += tempRhoCore[iQuad] / 2.0;
+              }
+          }
+        rhoOutData[rhoDataAttributes::values] = &densityValueOutXC;
+
+        rhoInData[rhoDataAttributes::values] = &densityValueInXC;
+
+        outputDerExchangeEnergy
+          [VeffOutputDataAttributes::derEnergyWithDensity] =
+            &derExchEnergyWithInputDensity;
+
+        outputDerCorrEnergy[VeffOutputDataAttributes::derEnergyWithDensity] =
+          &derCorrEnergyWithInputDensity;
+
+        if (excManagerPtr->getDensityBasedFamilyType() ==
+            densityFamilyType::GGA)
+          {
+            std::array<double, 3> gradXCRhoIn1, gradXCRhoIn2, gradXCRhoOut1,
+              gradXCRhoOut2, gradRhoOut1, gradRhoOut2;
+            const double *cellGradRhoInValues =
+              gradDensityInValues[0].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagZInValues =
+              gradDensityInValues[1].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagYInValues =
+              gradDensityInValues[2].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagXInValues =
+              gradDensityInValues[3].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradRhoOutValues =
+              gradDensityOutValues[0].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagZOutValues =
+              gradDensityOutValues[1].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagYOutValues =
+              gradDensityOutValues[2].data() + 3 * iCell * nQuadsPerCell;
+            const double *cellGradMagXOutValues =
+              gradDensityOutValues[3].data() + 3 * iCell * nQuadsPerCell;
+            for (unsigned int iQuad = 0; iQuad < nQuadsPerCell; ++iQuad)
+              {
+                for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                  {
+                    const double gradRhoInByTwo =
+                      cellGradRhoInValues[3 * iQuad + iDim] / 2.0;
+                    double gradMagInByTwo =
+                      (magInAxis[3 * iQuad + 2] *
+                         cellGradMagZInValues[3 * iQuad + iDim] +
+                       magInAxis[3 * iQuad + 1] *
+                         cellGradMagYInValues[3 * iQuad + iDim] +
+                       magInAxis[3 * iQuad + 0] *
+                         cellGradMagXInValues[3 * iQuad + iDim]) /
+                      2.0;
+                    const double gradRhoOutByTwo =
+                      cellGradRhoOutValues[3 * iQuad + iDim] / 2.0;
+                    double gradMagOutByTwo =
+                      (magOutAxis[3 * iQuad + 2] *
+                         cellGradMagZOutValues[3 * iQuad + iDim] +
+                       magOutAxis[3 * iQuad + 1] *
+                         cellGradMagYOutValues[3 * iQuad + iDim] +
+                       magOutAxis[3 * iQuad + 0] *
+                         cellGradMagXOutValues[3 * iQuad + iDim]) /
+                      2.0;
+                    gradXCRhoIn1[iDim]  = gradRhoInByTwo + gradMagInByTwo;
+                    gradXCRhoIn2[iDim]  = gradRhoInByTwo - gradMagInByTwo;
+                    gradXCRhoOut1[iDim] = gradRhoOutByTwo + gradMagOutByTwo;
+                    gradXCRhoOut2[iDim] = gradRhoOutByTwo - gradMagOutByTwo;
+                  }
+                gradRhoOut1 = gradXCRhoOut1;
+                gradRhoOut2 = gradXCRhoOut2;
+                if (d_dftParams.nonLinearCoreCorrection == true)
+                  {
+                    for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                      {
+                        gradXCRhoIn1[iDim] +=
+                          tempGradRhoCore[3 * iQuad + iDim] / 2.0;
+                        gradXCRhoIn2[iDim] +=
+                          tempGradRhoCore[3 * iQuad + iDim] / 2.0;
+                        gradXCRhoOut1[iDim] +=
+                          tempGradRhoCore[3 * iQuad + iDim] / 2.0;
+                        gradXCRhoOut2[iDim] +=
+                          tempGradRhoCore[3 * iQuad + iDim] / 2.0;
+                      }
+                  }
+                sigmaWithInputGradDensity[3 * iQuad + 0] =
+                  dot3(gradXCRhoIn1, gradXCRhoIn1);
+                sigmaWithInputGradDensity[3 * iQuad + 1] =
+                  dot3(gradXCRhoIn1, gradXCRhoIn2);
+                sigmaWithInputGradDensity[3 * iQuad + 2] =
+                  dot3(gradXCRhoIn2, gradXCRhoIn2);
+                sigmaWithOutputGradDensity[3 * iQuad + 0] =
+                  dot3(gradXCRhoOut1, gradXCRhoOut1);
+                sigmaWithOutputGradDensity[3 * iQuad + 1] =
+                  dot3(gradXCRhoOut1, gradXCRhoOut2);
+                sigmaWithOutputGradDensity[3 * iQuad + 2] =
+                  dot3(gradXCRhoOut2, gradXCRhoOut2);
+                gradXCRhoInDotgradRhoOut[3 * iQuad + 0] =
+                  dot3(gradXCRhoIn1, gradRhoOut1);
+                gradXCRhoInDotgradRhoOut[3 * iQuad + 1] =
+                  (dot3(gradXCRhoIn1, gradRhoOut2) +
+                   dot3(gradXCRhoIn2, gradRhoOut1)) /
+                  2.0;
+                gradXCRhoInDotgradRhoOut[3 * iQuad + 2] =
+                  dot3(gradXCRhoIn2, gradRhoOut2);
+              }
+            rhoOutData[rhoDataAttributes::sigmaGradValue] =
+              &sigmaWithOutputGradDensity;
+            rhoInData[rhoDataAttributes::sigmaGradValue] =
+              &sigmaWithInputGradDensity;
+            outputDerExchangeEnergy
+              [VeffOutputDataAttributes::derEnergyWithSigmaGradDensity] =
+                &derExchEnergyWithSigmaGradDenInput;
+            outputDerCorrEnergy
+              [VeffOutputDataAttributes::derEnergyWithSigmaGradDensity] =
+                &derCorrEnergyWithSigmaGradDenInput;
+          }
+        excManagerPtr->getExcDensityObj()->computeDensityBasedEnergyDensity(
+          nQuadsPerCell, rhoOutData, exchangeEnergyDensity, corrEnergyDensity);
+
+        excManagerPtr->getExcDensityObj()->computeDensityBasedVxc(
+          nQuadsPerCell,
+          rhoInData,
+          outputDerExchangeEnergy,
+          outputDerCorrEnergy);
+        for (unsigned int iQuad = 0; iQuad < nQuadsPerCell; ++iQuad)
+          {
+            double Vxc = derExchEnergyWithInputDensity[2 * iQuad + 0] +
+                         derCorrEnergyWithInputDensity[2 * iQuad + 0];
+            excCorrPotentialTimesRho +=
+              Vxc *
+              ((densityOutValues[0][iCell * nQuadsPerCell + iQuad] +
+                magOutNorm[iQuad]) /
+               2.0) *
+              basisOperationsPtr->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
+            Vxc = derExchEnergyWithInputDensity[2 * iQuad + 1] +
+                  derCorrEnergyWithInputDensity[2 * iQuad + 1];
+            excCorrPotentialTimesRho +=
+              Vxc *
+              ((densityOutValues[0][iCell * nQuadsPerCell + iQuad] -
+                magOutNorm[iQuad]) /
                2.0) *
               basisOperationsPtr->JxWBasisData()[iCell * nQuadsPerCell + iQuad];
             exchangeEnergy +=

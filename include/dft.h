@@ -879,6 +879,12 @@ namespace dftfe
       const dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
         &magQuadValues);
 
+    double
+    totalNonCollinearMagnetization(
+      const std::vector<
+        dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>>
+        &densityQuadValues);
+
     /**
      *@brief normalize the input electron density
      */

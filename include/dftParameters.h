@@ -137,6 +137,7 @@ namespace dftfe
     bool         deviceFineGrainedTimings;
     bool         allowFullCPUMemSubspaceRot;
     bool         useMixedPrecCheby;
+    bool         useSinglePrecCheby;
     bool         overlapComputeCommunCheby;
     bool         overlapComputeCommunOrthoRR;
     bool         autoDeviceBlockSizes;
@@ -152,6 +153,7 @@ namespace dftfe
     double       gaussianOrderMoveMeshToAtoms;
     bool         useFlatTopGenerator;
     double       diracDeltaKernelScalingConstant;
+    bool         useMeshSizesFromAtomsFile;
     double       xlbomdRestartChebyTol;
     bool         useDensityMatrixPerturbationRankUpdates;
     double       xlbomdKernelRankUpdateFDParameter;
@@ -169,6 +171,7 @@ namespace dftfe
     unsigned int highestStateOfInterestForChebFiltering;
     bool         useELPADeviceKernel;
     bool         memOptMode;
+    bool         noncolin;
 
 
     unsigned int dc_dispersioncorrectiontype;

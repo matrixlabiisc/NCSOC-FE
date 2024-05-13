@@ -652,6 +652,12 @@ namespace dftfe
           dealii::Patterns::Integer(0, 1),
           "[Standard] Spin polarization: 0 for no spin polarization and 1 for collinear spin polarization calculation. Default option is 0.");
 
+        prm.declare_entry(
+          "NONCOLLINEAR SPIN",
+          "false",
+          dealii::Patterns::Bool(),
+          "[Standard] Perform a noncollinear spin calculation. Default option is false.");
+
 
 
         prm.declare_entry(
@@ -975,16 +981,22 @@ namespace dftfe
             "[Advanced] Use mixed precision arithmetic in Rayleigh-Ritz subspace rotation step. Default setting is false.");
 
           prm.declare_entry(
-            "USE MIXED PREC CHEBY",
+            "USE SINGLE PREC COMMUN CHEBY",
             "false",
             dealii::Patterns::Bool(),
-            "[Advanced] Use mixed precision arithmetic in Chebyshev filtering. Currently this option is only available for real executable and USE ELPA=true for which DFT-FE also has to be linked to ELPA library. Default setting is false.");
+            "[Advanced] Use single precision communication in Chebyshev filtering. Currently this option is only available if USE ELPA=true for which DFT-FE also has to be linked to ELPA library. Default setting is false.");
 
           prm.declare_entry(
             "USE MIXED PREC COMMUN ONLY XTX XTHX",
             "false",
             dealii::Patterns::Bool(),
             "[Advanced] Use mixed precision communication only for XtX and XtHX instead of mixed precision compute and communication. This setting has been found to be more optimal on certain architectures. Default setting is false.");
+
+          prm.declare_entry(
+            "USE SINGLE PREC CHEBY",
+            "false",
+            dealii::Patterns::Bool(),
+            "[Advanced] Use a modified single precision algorithm for Chebyshev filtering. This cannot be used in conjunction with spectrum splitting. Default setting is false.");
 
           prm.declare_entry(
             "OVERLAP COMPUTE COMMUN CHEBY",
@@ -1538,13 +1550,14 @@ namespace dftfe
         dc_d3cutoffCN               = prm.get_double("CN CUTOFF");
       }
       prm.leave_subsection();
-      isPseudopotential     = prm.get_bool("PSEUDOPOTENTIAL CALCULATION");
-      pseudoTestsFlag       = prm.get_bool("PSEUDO TESTS FLAG");
-      pseudoPotentialFile   = prm.get("PSEUDOPOTENTIAL FILE NAMES LIST");
-      xc_id                 = prm.get_integer("EXCHANGE CORRELATION TYPE");
-      spinPolarized         = prm.get_integer("SPIN POLARIZATION");
-      modelXCInputFile      = prm.get("MODEL XC INPUT FILE");
-      start_magnetization   = prm.get_double("START MAGNETIZATION");
+      isPseudopotential   = prm.get_bool("PSEUDOPOTENTIAL CALCULATION");
+      pseudoTestsFlag     = prm.get_bool("PSEUDO TESTS FLAG");
+      pseudoPotentialFile = prm.get("PSEUDOPOTENTIAL FILE NAMES LIST");
+      xc_id               = prm.get_integer("EXCHANGE CORRELATION TYPE");
+      noncolin            = prm.get_bool("NONCOLLINEAR SPIN");
+      spinPolarized       = noncolin ? 0 : prm.get_integer("SPIN POLARIZATION");
+      modelXCInputFile    = prm.get("MODEL XC INPUT FILE");
+      start_magnetization = prm.get_double("START MAGNETIZATION");
       pspCutoffImageCharges = prm.get_double("PSP CUTOFF IMAGE CHARGES");
       netCharge             = prm.get_double("NET CHARGE");
     }
@@ -1610,7 +1623,8 @@ namespace dftfe
         useMixedPrecSubspaceRotRR = prm.get_bool("USE MIXED PREC RR_SR");
         useMixedPrecCommunOnlyXTHXCGSO =
           prm.get_bool("USE MIXED PREC COMMUN ONLY XTX XTHX");
-        useMixedPrecCheby = prm.get_bool("USE MIXED PREC CHEBY");
+        useMixedPrecCheby  = prm.get_bool("USE SINGLE PREC COMMUN CHEBY");
+        useSinglePrecCheby = prm.get_bool("USE SINGLE PREC CHEBY");
         overlapComputeCommunCheby =
           prm.get_bool("OVERLAP COMPUTE COMMUN CHEBY");
         overlapComputeCommunOrthoRR =
@@ -1975,7 +1989,7 @@ namespace dftfe
       AssertThrow(
         useELPA,
         dealii::ExcMessage(
-          "DFT-FE Error: USE ELPA must be set to true for USE MIXED PREC CHEBY."));
+          "DFT-FE Error: USE ELPA must be set to true for USE SINGLE PREC COMMUN CHEBY."));
 
     if (verbosity >= 5)
       computeEnergyEverySCF = true;
@@ -2016,6 +2030,9 @@ namespace dftfe
 
     if (numCoreWfcRR == 0)
       spectrumSplitStartingScfIter = 10000;
+
+    if (numCoreWfcRR != 0)
+      useSinglePrecCheby = false;
   }
 
 
