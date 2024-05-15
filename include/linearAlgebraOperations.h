@@ -1014,7 +1014,6 @@ namespace dftfe
       operatorDFTClass<dftfe::utils::MemorySpace::HOST> &operatorMatrix,
       const dataTypes::number *                          X,
       const unsigned int                                 totalNumberComponents,
-      const unsigned int                                 singlePrecComponents,
       const unsigned int                                 numberLocalDofs,
       const std::shared_ptr<const dftfe::ProcessGrid> &  processGrid,
       const MPI_Comm &                                   mpiCommDomain,
