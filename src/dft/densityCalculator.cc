@@ -322,8 +322,8 @@ namespace dftfe
               {
                 const unsigned int currentBlockSize =
                   std::min(BVec, Nfr - jvec);
-                flattenedArrayBlock =
-                  &(basisOperationsPtr->getMultiVector(currentBlockSize, 0));
+                flattenedArrayBlock = &(basisOperationsPtr->getMultiVector(
+                  currentBlockSize * numWfnSpinors, 0));
                 if ((jvec + totalNumWaveFunctions - Nfr + currentBlockSize) <=
                       bandGroupLowHighPlusOneIndices[2 * bandGroupTaskId + 1] &&
                     (jvec + totalNumWaveFunctions - Nfr + currentBlockSize) >
@@ -373,12 +373,13 @@ namespace dftfe
                     partialOccupVec.copyFrom(partialOccupVecHost);
 #endif
                     if (memorySpace == dftfe::utils::MemorySpace::HOST)
-                      for (unsigned int iNode = 0; iNode < numLocalDofs;
+                      for (unsigned int iNode = 0;
+                           iNode < numLocalDofs * numWfnSpinors;
                            ++iNode)
                         std::memcpy(flattenedArrayBlock->data() +
                                       iNode * currentBlockSize,
                                     XFrac->data() +
-                                      numLocalDofs * Nfr *
+                                      numLocalDofs * numWfnSpinors * Nfr *
                                         (numSpinComponents * kPoint +
                                          spinIndex) +
                                       iNode * Nfr + jvec,
@@ -389,14 +390,14 @@ namespace dftfe
                         stridedCopyToBlockConstantStride(
                           currentBlockSize,
                           Nfr,
-                          numLocalDofs,
+                          numLocalDofs * numWfnSpinors,
                           jvec,
                           XFrac->data() +
-                            numLocalDofs * Nfr *
+                            numLocalDofs * numWfnSpinors * Nfr *
                               (numSpinComponents * kPoint + spinIndex),
                           flattenedArrayBlock->data());
 #endif
-                    basisOperationsPtr->reinit(currentBlockSize,
+                    basisOperationsPtr->reinit(currentBlockSize * numWfnSpinors,
                                                cellsBlockSize,
                                                quadratureIndex,
                                                false);

@@ -794,11 +794,11 @@ namespace dftfe
       ValueTypeReal *         realArr,
       ValueTypeReal *         imagArr)
     {
-      for(unsigned int i = 0 ; i< size ; ++i)
-      {
-        realArr[i]=std::real(complexArr[i]);
-        imagArr[i]=std::imag(complexArr[i]);
-      }
+      for (unsigned int i = 0; i < size; ++i)
+        {
+          realArr[i] = std::real(complexArr[i]);
+          imagArr[i] = std::imag(complexArr[i]);
+        }
     }
 
 
@@ -1242,6 +1242,13 @@ namespace dftfe
                                                         float *      y) const;
 
     template void
+    BLASWrapper<dftfe::utils::MemorySpace::HOST>::axpby(const unsigned int n,
+                                                        const float  alpha,
+                                                        const float *x,
+                                                        const float  beta,
+                                                        float *      y) const;
+
+    template void
     BLASWrapper<dftfe::utils::MemorySpace::HOST>::ApaBD(const unsigned int m,
                                                         const unsigned int n,
                                                         const double  alpha,
@@ -1284,11 +1291,24 @@ namespace dftfe
       const double *         imagArr,
       std::complex<double> * complexArr);
     template void
+    BLASWrapper<dftfe::utils::MemorySpace::HOST>::copyRealArrsToComplexArr(
+      const dftfe::size_type size,
+      const float *          realArr,
+      const float *          imagArr,
+      std::complex<float> *  complexArr);
+    template void
     BLASWrapper<dftfe::utils::MemorySpace::HOST>::copyComplexArrToRealArrs(
-      const dftfe::size_type  size,
+      const dftfe::size_type      size,
+      const std::complex<double> *complexArr,
+      float *                     realArr,
+      float *                     imagArr);
+
+    template void
+    BLASWrapper<dftfe::utils::MemorySpace::HOST>::copyComplexArrToRealArrs(
+      const dftfe::size_type     size,
       const std::complex<float> *complexArr,
-      float *         realArr,
-      float *         imagArr);
+      float *                    realArr,
+      float *                    imagArr);
 
     template void
     BLASWrapper<dftfe::utils::MemorySpace::HOST>::stridedBlockAxpy(

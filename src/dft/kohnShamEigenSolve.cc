@@ -389,11 +389,13 @@ namespace dftfe
       d_eigenVectorsFlattenedHost.data() +
         ((1 + d_dftParamsPtr->spinPolarized) * kPointIndex + spinType) *
           d_numEigenValues *
-          matrix_free_data.get_vector_partitioner()->locally_owned_size(),
+          matrix_free_data.get_vector_partitioner()->locally_owned_size() *
+          spinorFactor,
       d_eigenVectorsRotFracDensityFlattenedHost.data() +
         ((1 + d_dftParamsPtr->spinPolarized) * kPointIndex + spinType) *
           d_numEigenValuesRR *
-          matrix_free_data.get_vector_partitioner()->locally_owned_size(),
+          matrix_free_data.get_vector_partitioner()->locally_owned_size() *
+          spinorFactor,
       d_numEigenValues,
       matrix_free_data.get_vector_partitioner()->locally_owned_size() *
         spinorFactor,
@@ -555,11 +557,15 @@ namespace dftfe
             d_eigenVectorsFlattenedDevice.begin() +
               ((1 + d_dftParamsPtr->spinPolarized) * kPointIndex + spinType) *
                 d_numEigenValues *
-                matrix_free_data.get_vector_partitioner()->locally_owned_size(),
+                matrix_free_data.get_vector_partitioner()
+                  ->locally_owned_size() *
+                spinorFactor,
             d_eigenVectorsRotFracFlattenedDevice.begin() +
               ((1 + d_dftParamsPtr->spinPolarized) * kPointIndex + spinType) *
                 d_numEigenValuesRR *
-                matrix_free_data.get_vector_partitioner()->locally_owned_size(),
+                matrix_free_data.get_vector_partitioner()
+                  ->locally_owned_size() *
+                spinorFactor,
             d_numEigenValues *
               matrix_free_data.get_vector_partitioner()->locally_owned_size() *
               spinorFactor,

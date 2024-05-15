@@ -196,7 +196,7 @@ namespace dftfe
           nDofsPerCell * nDofsPerCell *
           d_cellsBlockSizeHamiltonianConstruction);
       }
-    if (std::is_same<dataTypes::number, std::complex<double>>::value)
+    if constexpr (std::is_same<dataTypes::number, std::complex<double>>::value)
       tempHamMatrixImagBlock.resize(nDofsPerCell * nDofsPerCell *
                                     d_cellsBlockSizeHamiltonianConstruction);
     for (unsigned int iHamiltonian = 0;
@@ -215,7 +215,7 @@ namespace dftfe
     d_basisOperationsPtrHost->reinit(0, 0, d_densityQuadratureID, false);
     const unsigned int numberQuadraturePoints =
       d_basisOperationsPtrHost->nQuadsPerCell();
-    if (std::is_same<dataTypes::number, std::complex<double>>::value)
+    if constexpr (std::is_same<dataTypes::number, std::complex<double>>::value)
       for (unsigned int kPointIndex = 0; kPointIndex < d_kPointWeights.size();
            ++kPointIndex)
         {

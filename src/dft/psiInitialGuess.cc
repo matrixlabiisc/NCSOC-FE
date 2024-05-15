@@ -693,11 +693,14 @@ namespace dftfe
              ++kPoint)
           {
             dataTypes::number *temp1 = d_eigenVectorsFlattenedHost.data() +
-                                       kPoint * d_numEigenValues * numberDofs;
+                                       kPoint * d_numEigenValues * numberDofs *
+                                         (d_dftParamsPtr->noncolin ? 2 : 1);
 
             dataTypes::number *temp2 = d_eigenVectorsFlattenedHost.data();
 
-            for (unsigned int idof = 0; idof < numberDofs; idof++)
+            for (unsigned int idof = 0;
+                 idof < numberDofs * (d_dftParamsPtr->noncolin ? 2 : 1);
+                 idof++)
               for (unsigned int iwave = 0; iwave < d_numEigenValues; iwave++)
                 temp1[idof * d_numEigenValues + iwave] =
                   temp2[idof * d_numEigenValues + iwave];

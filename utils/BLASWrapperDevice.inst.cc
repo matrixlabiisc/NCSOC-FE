@@ -395,6 +395,13 @@ BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::axpby(const unsigned int n,
                                                       const double       beta,
                                                       float *y) const;
 
+template void
+BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::axpby(const unsigned int n,
+                                                      const float        alpha,
+                                                      const float *      x,
+                                                      const float        beta,
+                                                      float *y) const;
+
 
 template void
 BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::axpby(
@@ -466,11 +473,25 @@ BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::copyRealArrsToComplexArr(
   std::complex<double> * complexArr);
 
 template void
+BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::copyRealArrsToComplexArr(
+  const dftfe::size_type size,
+  const float *          realArr,
+  const float *          imagArr,
+  std::complex<float> *  complexArr);
+
+template void
 BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::copyComplexArrToRealArrs(
-  const dftfe::size_type  size,
+  const dftfe::size_type      size,
+  const std::complex<double> *complexArr,
+  float *                     realArr,
+  float *                     imagArr);
+
+template void
+BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::copyComplexArrToRealArrs(
+  const dftfe::size_type     size,
   const std::complex<float> *complexArr,
-  float *         realArr,
-  float *         imagArr)
+  float *                    realArr,
+  float *                    imagArr);
 
 template void
 BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::stridedBlockAxpy(
