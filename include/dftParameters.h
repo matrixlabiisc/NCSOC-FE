@@ -51,7 +51,8 @@ namespace dftfe
     bool   adaptAndersonMixingParameter;
     bool   diagonalMassMatrix;
     double absLinearSolverTolerance, selfConsistentSolverTolerance, TVal,
-      start_magnetization, absLinearSolverToleranceHelmholtz;
+      selfConsistentSolverEnergyTolerance, start_magnetization,
+      absLinearSolverToleranceHelmholtz;
 
     bool isPseudopotential, periodicX, periodicY, periodicZ, useSymm,
       timeReversal, pseudoTestsFlag, constraintMagnetization, writeDosFile,
@@ -115,6 +116,7 @@ namespace dftfe
     unsigned int subspaceRotDofsBlockSize;
     unsigned int nbandGrps;
     bool         computeEnergyEverySCF;
+    bool         useEnergyResidualTolerance;
     unsigned int scalapackParalProcs;
     unsigned int scalapackBlockSize;
     unsigned int natoms;
