@@ -2590,7 +2590,8 @@ namespace dftfe
               }
 
             if (d_dftParamsPtr->verbosity >= 1 &&
-                d_dftParamsPtr->spinPolarized == 1)
+                (d_dftParamsPtr->spinPolarized == 1 ||
+                 d_dftParamsPtr->noncolin))
               pcout << d_dftParamsPtr->mixingMethod
                     << " mixing, L2 norm of total density difference: " << norm
                     << std::endl;
@@ -4222,17 +4223,44 @@ namespace dftfe
                             d_densityOutQuadValues[0],
                             rhoNodalField);
 
-    distributedCPUVec<double> magNodalField;
+    distributedCPUVec<double> magNodalFieldz, magNodalFieldy, magNodalFieldx;
     if (d_dftParamsPtr->spinPolarized == 1)
       {
-        magNodalField.reinit(rhoNodalField);
-        magNodalField = 0;
+        magNodalFieldz.reinit(rhoNodalField);
+        magNodalFieldz = 0;
         l2ProjectionQuadToNodal(d_basisOperationsPtrElectroHost,
                                 d_constraintsRhoNodal,
                                 d_densityDofHandlerIndexElectro,
                                 d_densityQuadratureIdElectro,
                                 d_densityOutQuadValues[1],
-                                magNodalField);
+                                magNodalFieldz);
+      }
+    else if (d_dftParamsPtr->noncolin)
+      {
+        magNodalFieldz.reinit(rhoNodalField);
+        magNodalFieldz = 0;
+        l2ProjectionQuadToNodal(d_basisOperationsPtrElectroHost,
+                                d_constraintsRhoNodal,
+                                d_densityDofHandlerIndexElectro,
+                                d_densityQuadratureIdElectro,
+                                d_densityOutQuadValues[1],
+                                magNodalFieldz);
+        magNodalFieldy.reinit(rhoNodalField);
+        magNodalFieldy = 0;
+        l2ProjectionQuadToNodal(d_basisOperationsPtrElectroHost,
+                                d_constraintsRhoNodal,
+                                d_densityDofHandlerIndexElectro,
+                                d_densityQuadratureIdElectro,
+                                d_densityOutQuadValues[2],
+                                magNodalFieldy);
+        magNodalFieldx.reinit(rhoNodalField);
+        magNodalFieldx = 0;
+        l2ProjectionQuadToNodal(d_basisOperationsPtrElectroHost,
+                                d_constraintsRhoNodal,
+                                d_densityDofHandlerIndexElectro,
+                                d_densityQuadratureIdElectro,
+                                d_densityOutQuadValues[3],
+                                magNodalFieldx);
       }
 
     //
@@ -4243,7 +4271,13 @@ namespace dftfe
     dataOutRho.add_data_vector(rhoNodalField, std::string("chargeDensity"));
     if (d_dftParamsPtr->spinPolarized == 1)
       {
-        dataOutRho.add_data_vector(magNodalField, std::string("magDensity"));
+        dataOutRho.add_data_vector(magNodalFieldz, std::string("magDensity"));
+      }
+    else if (d_dftParamsPtr->noncolin)
+      {
+        dataOutRho.add_data_vector(magNodalFieldz, std::string("magDensityZ"));
+        dataOutRho.add_data_vector(magNodalFieldy, std::string("magDensityY"));
+        dataOutRho.add_data_vector(magNodalFieldx, std::string("magDensityX"));
       }
     dataOutRho.set_flags(dealii::DataOutBase::VtkFlags(
       std::numeric_limits<double>::min(),
