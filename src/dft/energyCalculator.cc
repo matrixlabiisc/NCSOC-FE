@@ -905,6 +905,19 @@ namespace dftfe
                                         exchangeEnergy,
                                         correlationEnergy,
                                         excCorrPotentialTimesRho);
+    else if (d_dftParams.noncolin)
+      computeXCEnergyTermsNonCollinear(basisOperationsPtr,
+                                       densityQuadratureID,
+                                       excManagerPtr,
+                                       densityInValues,
+                                       densityInValues,
+                                       gradDensityInValues,
+                                       gradDensityInValues,
+                                       rhoCoreValues,
+                                       gradRhoCoreValues,
+                                       exchangeEnergy,
+                                       correlationEnergy,
+                                       excCorrPotentialTimesRho);
     else
       computeXCEnergyTerms(basisOperationsPtr,
                            densityQuadratureID,
