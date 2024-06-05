@@ -436,8 +436,7 @@ namespace dftfe
         elpaScala.getProcessGridDftfeScalaWrapper();
 
       if (!(dftParams.useMixedPrecCGS_O && useMixedPrec))
-        computing_timer.enter_subsection(
-          "SConj=X^{T}OXConj, RR GEP step");
+        computing_timer.enter_subsection("SConj=X^{T}OXConj, RR GEP step");
       else
         computing_timer.enter_subsection(
           "SConj=X^{T}OXConj mixed prec, RR GEP step");
@@ -480,8 +479,7 @@ namespace dftfe
                         overlapMatPar);
         }
       if (!(dftParams.useMixedPrecCGS_O && useMixedPrec))
-        computing_timer.leave_subsection(
-          "SConj=X^{T}OXConj, RR GEP step");
+        computing_timer.leave_subsection("SConj=X^{T}OXConj, RR GEP step");
       else
         computing_timer.leave_subsection(
           "SConj=X^{T}OXConj mixed prec, RR GEP step");
@@ -563,11 +561,9 @@ namespace dftfe
       computing_timer.leave_subsection("Cholesky and triangular matrix invert");
 
       if (!(dftParams.useMixedPrecXTHXSpectrumSplit && useMixedPrec))
-        computing_timer.enter_subsection(
-          "Compute ProjHam, RR step");
+        computing_timer.enter_subsection("Compute ProjHam, RR step");
       else
-        computing_timer.enter_subsection(
-          "Compute ProjHam mixed prec, RR step");
+        computing_timer.enter_subsection("Compute ProjHam mixed prec, RR step");
       //
       // compute projected Hamiltonian conjugate HConjProj= X^{T}*HConj*XConj
       //
@@ -607,11 +603,9 @@ namespace dftfe
                         projHamPar);
         }
       if (!(dftParams.useMixedPrecXTHXSpectrumSplit && useMixedPrec))
-        computing_timer.leave_subsection(
-          "Compute ProjHam, RR step");
+        computing_timer.leave_subsection("Compute ProjHam, RR step");
       else
-        computing_timer.leave_subsection(
-          "Compute ProjHam mixed prec, RR step");
+        computing_timer.leave_subsection("Compute ProjHam mixed prec, RR step");
 
       computing_timer.enter_subsection(
         "Compute HSConjProj= Lconj^{-1}*HConjProj*(Lconj^{-1})^C, RR step");
@@ -3531,8 +3525,9 @@ namespace dftfe
 
       std::vector<dataTypes::numberFP32> projHamBlockSinglePrec(
         N * vectorsBlockSize, 0.0);
-      std::vector<dataTypes::number> projHamBlockDoublePrec(
-        vectorsBlockSize * vectorsBlockSize, 0.0);
+      std::vector<dataTypes::number> projHamBlockDoublePrec(vectorsBlockSize *
+                                                              vectorsBlockSize,
+                                                            0.0);
       std::vector<dataTypes::number> projHamBlock(N * vectorsBlockSize, 0.0);
 
       std::vector<dataTypes::numberFP32> HXBlockSinglePrec;
@@ -3662,7 +3657,7 @@ namespace dftfe
                         &B,
                         &beta,
                         &projHamBlockDoublePrec[0],
-                        &D);
+                        &B);
                   const unsigned int DRem = D - B;
                   if (DRem != 0)
                     {
@@ -3685,7 +3680,7 @@ namespace dftfe
 
                   MPI_Barrier(mpiCommDomain);
                   MPI_Allreduce(MPI_IN_PLACE,
-                                &projHamBlockSinglePrec[0],
+                                &projHamBlockDoublePrec[0],
                                 B * B,
                                 dataTypes::mpi_type_id(
                                   &projHamBlockDoublePrec[0]),

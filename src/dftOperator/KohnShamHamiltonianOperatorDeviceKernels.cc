@@ -67,13 +67,13 @@ namespace dftfe
             .x = H_bxIJ;
           cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
                                 2 * nDofsPerCell * (2 * iDoF + 1) + 2 * jDoF]
-            .y = -H_byIJ;
+            .y = H_byIJ;
           cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
                                 2 * nDofsPerCell * (2 * iDoF) + 2 * jDoF + 1]
             .x = H_bxIJ;
           cellHamiltonianMatrix[iCell * nDofsPerCell * nDofsPerCell * 4 +
                                 2 * nDofsPerCell * (2 * iDoF) + 2 * jDoF + 1]
-            .y = H_byIJ;
+            .y = -H_byIJ;
         }
     }
   } // namespace

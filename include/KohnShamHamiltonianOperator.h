@@ -36,6 +36,9 @@ namespace dftfe
       std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
         BLASWrapperPtr,
       std::shared_ptr<
+        dftfe::linearAlgebra::BLASWrapper<dftfe::utils::MemorySpace::HOST>>
+        BLASWrapperPtrHost,
+      std::shared_ptr<
         dftfe::basis::FEBasisOperations<dataTypes::number, double, memorySpace>>
         basisOperationsPtr,
       std::shared_ptr<
@@ -213,6 +216,9 @@ namespace dftfe
 
     std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
       d_BLASWrapperPtr;
+    std::shared_ptr<
+      dftfe::linearAlgebra::BLASWrapper<dftfe::utils::MemorySpace::HOST>>
+      d_BLASWrapperPtrHost;
     std::shared_ptr<
       dftfe::basis::FEBasisOperations<dataTypes::number, double, memorySpace>>
       d_basisOperationsPtr;

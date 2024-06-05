@@ -287,12 +287,13 @@ namespace dftfe
               d_lpspQuadratureId,
               d_feOrderPlusOneQuadratureId,
               d_sparsityPatternQuadratureId};
-            std::vector<dftfe::basis::UpdateFlags> updateFlags{updateFlagsAll,
-                                                               updateFlagsAll,
-                                                               updateFlagsAll,
-                                                               updateFlagsAll,
-                                                               updateFlagsAll,
-                                                               updateFlagsAll};
+            std::vector<dftfe::basis::UpdateFlags> updateFlags{
+              updateFlagsAll | dftfe::basis::update_collocation_gradients,
+              updateFlagsAll,
+              updateFlagsAll,
+              updateFlagsAll,
+              updateFlagsAll,
+              updateFlagsAll};
             d_basisOperationsPtrHost->init(matrix_free_data,
                                            d_constraintsVector,
                                            d_densityDofHandlerIndex,
@@ -392,8 +393,8 @@ namespace dftfe
                 50,
                 true,
                 !d_dftParamsPtr->diagonalMassMatrix);
-            d_basisOperationsPtrDevice->computeInverseSqrtMassVector(
-              true, !d_dftParamsPtr->diagonalMassMatrix);
+            d_basisOperationsPtrDevice->computeInverseSqrtMassVector(true,
+                                                                     true);
             unsigned int BVec2 =
               std::min(d_dftParamsPtr->wfcBlockSize, d_numEigenValues);
             if (BVec != BVec2)

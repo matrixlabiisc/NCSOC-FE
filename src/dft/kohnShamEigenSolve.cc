@@ -619,7 +619,7 @@ namespace dftfe
           {
             for (unsigned int i = 0; i < d_numEigenValues; i++)
               {
-                if (d_dftParamsPtr->verbosity >= 5)
+                if (d_dftParamsPtr->verbosity >= 4)
                   pcout << "eigen value " << std::setw(3) << i << ": "
                         << eigenValuesTemp[i] << std::endl;
 

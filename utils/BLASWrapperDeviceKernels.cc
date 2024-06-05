@@ -167,11 +167,9 @@ namespace dftfe
           dftfe::size_type intraBlockIndex =
             index - blockIndex * contiguousBlockSize;
           const ValueType1 coeff = dftfe::utils::mult(a, s[blockIndex]);
-          dftfe::utils::copyValue(
-            copyToVec + index,
-            dftfe::utils::mult(
-              copyFromVec[contiguousBlockSize * blockIndex + intraBlockIndex],
-              coeff));
+          dftfe::utils::copyValue(copyToVec + index,
+                                  dftfe::utils::mult(copyFromVec[index],
+                                                     coeff));
         }
     }
 

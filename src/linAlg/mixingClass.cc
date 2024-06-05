@@ -365,7 +365,7 @@ namespace dftfe
   void
   MixingScheme::popOldHistory(unsigned int mixingHistory)
   {
-    if (d_variableHistoryIn[mixingVariable::rho].size() >= mixingHistory)
+    if (d_variableHistoryIn[mixingVariable::rho].size() > mixingHistory)
       {
         for (const auto &[key, value] : d_variableHistoryIn)
           {

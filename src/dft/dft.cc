@@ -1881,6 +1881,7 @@ namespace dftfe
     if constexpr (dftfe::utils::MemorySpace::DEVICE == memorySpace)
       d_kohnShamDFTOperatorPtr = new KohnShamHamiltonianOperator<memorySpace>(
         d_BLASWrapperPtr,
+        d_BLASWrapperPtrHost,
         d_basisOperationsPtrDevice,
         d_basisOperationsPtrHost,
         d_oncvClassPtr,
@@ -1894,6 +1895,7 @@ namespace dftfe
     else
 #endif
       d_kohnShamDFTOperatorPtr = new KohnShamHamiltonianOperator<memorySpace>(
+        d_BLASWrapperPtrHost,
         d_BLASWrapperPtrHost,
         d_basisOperationsPtrHost,
         d_basisOperationsPtrHost,
@@ -2224,6 +2226,26 @@ namespace dftfe
                            d_dftParamsPtr->chebyshevTolerance;
     std::vector<mixingVariable> mixingVariables;
     std::vector<mixingVariable> gradMixingVariables;
+    mixingVariables.resize(d_dftParamsPtr->noncolin ?
+                             4 :
+                             (d_dftParamsPtr->spinPolarized == 1 ? 2 : 1));
+    gradMixingVariables.resize(mixingVariables.size());
+    mixingVariables[0]     = mixingVariable::rho;
+    gradMixingVariables[0] = mixingVariable::gradRho;
+    if (d_dftParamsPtr->spinPolarized == 1)
+      {
+        mixingVariables[1]     = mixingVariable::magZ;
+        gradMixingVariables[1] = mixingVariable::gradMagZ;
+      }
+    if (d_dftParamsPtr->noncolin)
+      {
+        mixingVariables[1]     = mixingVariable::magZ;
+        mixingVariables[2]     = mixingVariable::magY;
+        mixingVariables[3]     = mixingVariable::magX;
+        gradMixingVariables[1] = mixingVariable::gradMagZ;
+        gradMixingVariables[2] = mixingVariable::gradMagY;
+        gradMixingVariables[3] = mixingVariable::gradMagX;
+      }
 
     // call the mixing scheme with the mixing variables
     // Have to be called once for each variable
@@ -2234,19 +2256,13 @@ namespace dftfe
         dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
           rhoNodalMassVec;
         computeRhoNodalMassVector(rhoNodalMassVec);
-        d_mixingScheme.addMixingVariable(
-          mixingVariable::rho,
-          rhoNodalMassVec,
-          true, // call MPI REDUCE while computing dot products
-          d_dftParamsPtr->mixingParameter,
-          d_dftParamsPtr->adaptAndersonMixingParameter);
-        if (d_dftParamsPtr->spinPolarized == 1)
+        for (unsigned int iMix = 0; iMix < mixingVariables.size(); ++iMix)
           d_mixingScheme.addMixingVariable(
-            mixingVariable::magZ,
+            mixingVariables[iMix],
             rhoNodalMassVec,
             true, // call MPI REDUCE while computing dot products
             d_dftParamsPtr->mixingParameter *
-              d_dftParamsPtr->spinMixingEnhancementFactor,
+              (iMix > 0 ? d_dftParamsPtr->spinMixingEnhancementFactor : 1.0),
             d_dftParamsPtr->adaptAndersonMixingParameter);
       }
     else if (d_dftParamsPtr->mixingMethod == "ANDERSON")
@@ -2255,109 +2271,30 @@ namespace dftfe
                                                 0,
                                                 d_densityQuadratureIdElectro,
                                                 false);
-        mixingVariables.resize(d_dftParamsPtr->noncolin ?
-                                 4 :
-                                 (d_dftParamsPtr->spinPolarized == 1 ? 2 : 1));
-        gradMixingVariables.resize(mixingVariables.size());
-        mixingVariables[0]     = mixingVariable::rho;
-        gradMixingVariables[0] = mixingVariable::gradRho;
-        if (d_dftParamsPtr->spinPolarized == 1)
-          {
-            mixingVariables[1]     = mixingVariable::magZ;
-            gradMixingVariables[1] = mixingVariable::gradMagZ;
-          }
-        if (d_dftParamsPtr->noncolin)
-          {
-            mixingVariables[1]     = mixingVariable::magZ;
-            mixingVariables[2]     = mixingVariable::magY;
-            mixingVariables[3]     = mixingVariable::magX;
-            gradMixingVariables[1] = mixingVariable::gradMagZ;
-            gradMixingVariables[2] = mixingVariable::gradMagY;
-            gradMixingVariables[3] = mixingVariable::gradMagX;
-          }
-        d_mixingScheme.addMixingVariable(
-          mixingVariable::rho,
-          d_basisOperationsPtrElectroHost->JxWBasisData(),
-          true, // call MPI REDUCE while computing dot products
-          d_dftParamsPtr->mixingParameter,
-          d_dftParamsPtr->adaptAndersonMixingParameter);
-        if (d_dftParamsPtr->spinPolarized == 1)
+        for (unsigned int iMix = 0; iMix < mixingVariables.size(); ++iMix)
           d_mixingScheme.addMixingVariable(
-            mixingVariable::magZ,
+            mixingVariables[iMix],
             d_basisOperationsPtrElectroHost->JxWBasisData(),
             true, // call MPI REDUCE while computing dot products
             d_dftParamsPtr->mixingParameter *
-              d_dftParamsPtr->spinMixingEnhancementFactor,
+              (iMix > 0 ? d_dftParamsPtr->spinMixingEnhancementFactor : 1.0),
             d_dftParamsPtr->adaptAndersonMixingParameter);
-        if (d_dftParamsPtr->noncolin)
-          {
-            d_mixingScheme.addMixingVariable(
-              mixingVariable::magZ,
-              d_basisOperationsPtrElectroHost->JxWBasisData(),
-              true, // call MPI REDUCE while computing dot products
-              d_dftParamsPtr->mixingParameter *
-                d_dftParamsPtr->spinMixingEnhancementFactor,
-              d_dftParamsPtr->adaptAndersonMixingParameter);
-            d_mixingScheme.addMixingVariable(
-              mixingVariable::magY,
-              d_basisOperationsPtrElectroHost->JxWBasisData(),
-              true, // call MPI REDUCE while computing dot products
-              d_dftParamsPtr->mixingParameter *
-                d_dftParamsPtr->spinMixingEnhancementFactor,
-              d_dftParamsPtr->adaptAndersonMixingParameter);
-            d_mixingScheme.addMixingVariable(
-              mixingVariable::magX,
-              d_basisOperationsPtrElectroHost->JxWBasisData(),
-              true, // call MPI REDUCE while computing dot products
-              d_dftParamsPtr->mixingParameter *
-                d_dftParamsPtr->spinMixingEnhancementFactor,
-              d_dftParamsPtr->adaptAndersonMixingParameter);
-          }
         if (d_excManagerPtr->getDensityBasedFamilyType() ==
             densityFamilyType::GGA)
           {
             dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
               gradRhoJxW;
             gradRhoJxW.resize(0);
-            d_mixingScheme.addMixingVariable(
-              mixingVariable::gradRho,
-              gradRhoJxW, // this is just a dummy variable to make it
-                          // compatible with rho
-              false,      // call MPI REDUCE while computing dot products
-              d_dftParamsPtr->mixingParameter,
-              d_dftParamsPtr->adaptAndersonMixingParameter);
-            if (d_dftParamsPtr->spinPolarized == 1)
+            for (unsigned int iMix = 0; iMix < gradMixingVariables.size();
+                 ++iMix)
               d_mixingScheme.addMixingVariable(
-                mixingVariable::gradMagZ,
+                gradMixingVariables[iMix],
                 gradRhoJxW,
                 false, // call MPI REDUCE while computing dot products
                 d_dftParamsPtr->mixingParameter *
-                  d_dftParamsPtr->spinMixingEnhancementFactor,
+                  (iMix > 0 ? d_dftParamsPtr->spinMixingEnhancementFactor :
+                              1.0),
                 d_dftParamsPtr->adaptAndersonMixingParameter);
-            if (d_dftParamsPtr->noncolin)
-              {
-                d_mixingScheme.addMixingVariable(
-                  mixingVariable::gradMagZ,
-                  gradRhoJxW,
-                  false, // call MPI REDUCE while computing dot products
-                  d_dftParamsPtr->mixingParameter *
-                    d_dftParamsPtr->spinMixingEnhancementFactor,
-                  d_dftParamsPtr->adaptAndersonMixingParameter);
-                d_mixingScheme.addMixingVariable(
-                  mixingVariable::gradMagY,
-                  gradRhoJxW,
-                  false, // call MPI REDUCE while computing dot products
-                  d_dftParamsPtr->mixingParameter *
-                    d_dftParamsPtr->spinMixingEnhancementFactor,
-                  d_dftParamsPtr->adaptAndersonMixingParameter);
-                d_mixingScheme.addMixingVariable(
-                  mixingVariable::gradMagX,
-                  gradRhoJxW,
-                  false, // call MPI REDUCE while computing dot products
-                  d_dftParamsPtr->mixingParameter *
-                    d_dftParamsPtr->spinMixingEnhancementFactor,
-                  d_dftParamsPtr->adaptAndersonMixingParameter);
-              }
           }
       }
     //
@@ -2410,7 +2347,9 @@ namespace dftfe
               {
                 // Fill in New Kerker framework here
                 std::vector<double> norms(
-                  d_dftParamsPtr->spinPolarized == 1 ? 2 : 1);
+                  d_dftParamsPtr->noncolin ?
+                    4 :
+                    (d_dftParamsPtr->spinPolarized == 1 ? 2 : 1));
                 if (scfIter == 1)
                   d_densityResidualNodalValues.resize(
                     d_densityOutNodalValues.size());
@@ -2432,38 +2371,30 @@ namespace dftfe
                   CGSolver,
                   d_densityResidualNodalValues[0],
                   d_preCondTotalDensityResidualVector);
-                d_mixingScheme.addVariableToInHist(
-                  mixingVariable::rho,
-                  d_densityInNodalValues[0].begin(),
-                  d_densityInNodalValues[0].locally_owned_size());
-                d_mixingScheme.addVariableToResidualHist(
-                  mixingVariable::rho,
-                  d_preCondTotalDensityResidualVector.begin(),
-                  d_preCondTotalDensityResidualVector.locally_owned_size());
-                if (d_dftParamsPtr->spinPolarized == 1)
+                for (unsigned int iComp = 0;
+                     iComp < d_densityOutNodalValues.size();
+                     ++iComp)
                   {
                     d_mixingScheme.addVariableToInHist(
-                      mixingVariable::magZ,
-                      d_densityInNodalValues[1].begin(),
-                      d_densityInNodalValues[1].locally_owned_size());
+                      mixingVariables[iComp],
+                      d_densityInNodalValues[iComp].begin(),
+                      d_densityInNodalValues[iComp].locally_owned_size());
                     d_mixingScheme.addVariableToResidualHist(
-                      mixingVariable::magZ,
-                      d_densityResidualNodalValues[1].begin(),
-                      d_densityResidualNodalValues[1].locally_owned_size());
+                      mixingVariables[iComp],
+                      mixingVariable::rho == mixingVariables[iComp] ?
+                        d_preCondTotalDensityResidualVector.begin() :
+                        d_densityResidualNodalValues[iComp].begin(),
+                      d_preCondTotalDensityResidualVector.locally_owned_size());
                   }
                 // Delete old history if it exceeds a pre-described
                 // length
                 d_mixingScheme.popOldHistory(d_dftParamsPtr->mixingHistory);
 
                 // Compute the mixing coefficients
-                d_mixingScheme.computeAndersonMixingCoeff(
-                  d_dftParamsPtr->spinPolarized == 1 ?
-                    std::vector<mixingVariable>{mixingVariable::rho,
-                                                mixingVariable::magZ} :
-                    std::vector<mixingVariable>{mixingVariable::rho});
+                d_mixingScheme.computeAndersonMixingCoeff(mixingVariables);
                 for (unsigned int iComp = 0; iComp < norms.size(); ++iComp)
                   d_mixingScheme.mixVariable(
-                    iComp == 0 ? mixingVariable::rho : mixingVariable::magZ,
+                    mixingVariables[iComp],
                     d_densityInNodalValues[iComp].begin(),
                     d_densityInNodalValues[iComp].locally_owned_size());
                 norm = 0.0;
@@ -2600,6 +2531,11 @@ namespace dftfe
                     << " mixing, L2 norm of total density difference: " << norm
                     << std::endl;
           }
+        if (d_dftParamsPtr->verbosity >= 1 && d_dftParamsPtr->noncolin)
+          pcout << std::endl
+                << "net magnetization: "
+                << totalNonCollinearMagnetization(d_densityInQuadValues)
+                << std::endl;
 
         if (d_dftParamsPtr->computeEnergyEverySCF &&
             d_numEigenValuesRR == d_numEigenValues)

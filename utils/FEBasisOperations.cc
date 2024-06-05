@@ -241,6 +241,17 @@ namespace dftfe
                       .find(quadIndex)
                       ->second);
                 }
+              if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+                {
+                  d_collocationShapeFunctionGradientData[quadIndex].resize(
+                    basisOperationsSrc.d_collocationShapeFunctionGradientData
+                      .find(quadIndex)
+                      ->second.size());
+                  d_collocationShapeFunctionGradientData[quadIndex].copyFrom(
+                    basisOperationsSrc.d_collocationShapeFunctionGradientData
+                      .find(quadIndex)
+                      ->second);
+                }
             }
         }
       if constexpr (!std::is_same<ValueTypeBasisCoeff,
@@ -309,6 +320,19 @@ namespace dftfe
                     d_shapeFunctionGradientBasisDataTranspose[quadIndex]
                       .copyFrom(basisOperationsSrc
                                   .d_shapeFunctionGradientBasisDataTranspose
+                                  .find(quadIndex)
+                                  ->second);
+                  }
+                if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+                  {
+                    d_collocationShapeFunctionGradientBasisData[quadIndex]
+                      .resize(basisOperationsSrc
+                                .d_collocationShapeFunctionGradientBasisData
+                                .find(quadIndex)
+                                ->second.size());
+                    d_collocationShapeFunctionGradientBasisData[quadIndex]
+                      .copyFrom(basisOperationsSrc
+                                  .d_collocationShapeFunctionGradientBasisData
                                   .find(quadIndex)
                                   ->second);
                   }
@@ -420,6 +444,17 @@ namespace dftfe
                d_shapeFunctionGradientDataTranspose.find(d_quadratureID)
                  ->second :
                d_shapeFunctionGradientData.find(d_quadratureID)->second;
+    }
+
+    template <typename ValueTypeBasisCoeff,
+              typename ValueTypeBasisData,
+              dftfe::utils::MemorySpace memorySpace>
+    const dftfe::utils::MemoryStorage<ValueTypeBasisCoeff, memorySpace> &
+    FEBasisOperations<ValueTypeBasisCoeff, ValueTypeBasisData, memorySpace>::
+      collocationShapeFunctionGradientData() const
+    {
+      return d_collocationShapeFunctionGradientData.find(d_quadratureID)
+        ->second;
     }
 
     template <typename ValueTypeBasisCoeff,
@@ -855,10 +890,18 @@ namespace dftfe
             d_matrixFreeDataPtr->get_dof_handler(d_dofHandlerID).get_fe(),
             quadrature,
             dealii::update_values | dealii::update_gradients);
+          dealii::FE_DGQArbitraryNodes<3> fe_dgq(
+            d_matrixFreeDataPtr->get_shape_info(d_dofHandlerID, quadID)
+              .get_shape_data()
+              .quadrature);
+          dealii::FEValues<3>      fe_values_collocation(fe_dgq,
+                                                    quadrature,
+                                                    dealii::update_gradients);
           dealii::Triangulation<3> reference_cell;
           dealii::GridGenerator::hyper_cube(reference_cell, 0., 1.);
           fe_values_reference.reinit(reference_cell.begin());
-
+          if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+            fe_values_collocation.reinit(reference_cell.begin());
           d_nQuadsPerCell[iQuadIndex] = quadrature.size();
 
 #if defined(DFTFE_WITH_DEVICE)
@@ -882,6 +925,9 @@ namespace dftfe
             d_shapeFunctionGradientDataHost;
           dftfe::utils::MemoryStorage<ValueTypeBasisCoeff,
                                       dftfe::utils::MemorySpace::HOST>
+            d_collocationShapeFunctionGradientDataHost;
+          dftfe::utils::MemoryStorage<ValueTypeBasisCoeff,
+                                      dftfe::utils::MemorySpace::HOST>
             d_shapeFunctionGradientDataTransposeHost;
 #else
           auto &d_inverseJacobianDataHost =
@@ -894,6 +940,8 @@ namespace dftfe
             d_shapeFunctionDataTranspose[quadID];
           auto &d_shapeFunctionGradientDataHost =
             d_shapeFunctionGradientData[quadID];
+          auto &d_collocationShapeFunctionGradientDataHost =
+            d_collocationShapeFunctionGradientData[quadID];
           auto &d_shapeFunctionGradientDataTransposeHost =
             d_shapeFunctionGradientDataTranspose[quadID];
 #endif
@@ -916,6 +964,7 @@ namespace dftfe
               d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell, 0.0);
           d_shapeFunctionGradientDataInternalLayoutHost.clear();
           d_shapeFunctionGradientDataHost.clear();
+          d_collocationShapeFunctionGradientDataHost.clear();
           d_shapeFunctionGradientDataTransposeHost.clear();
           if (d_updateFlags[iQuadIndex] & update_gradients)
             {
@@ -923,6 +972,10 @@ namespace dftfe
                 d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell * 3, 0.0);
               d_shapeFunctionGradientDataHost.resize(
                 d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell * 3, 0.0);
+              if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+                d_collocationShapeFunctionGradientDataHost.resize(
+                  d_nQuadsPerCell[iQuadIndex] * d_nQuadsPerCell[iQuadIndex] * 3,
+                  0.0);
               if (d_updateFlags[iQuadIndex] & update_transpose)
                 d_shapeFunctionGradientDataTransposeHost.resize(
                   d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell * 3, 0.0);
@@ -975,6 +1028,19 @@ namespace dftfe
                       [iDim * d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell +
                        iQuad * d_nDofsPerCell + iNode] =
                         fe_values_reference.shape_grad(iNode, iQuad)[iDim];
+
+              if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+                for (unsigned int iNode = 0;
+                     iNode < d_nQuadsPerCell[iQuadIndex];
+                     ++iNode)
+                  for (unsigned int iQuad = 0;
+                       iQuad < d_nQuadsPerCell[iQuadIndex];
+                       ++iQuad)
+                    for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                      d_collocationShapeFunctionGradientDataHost
+                        [iNode * d_nQuadsPerCell[iQuadIndex] * 3 + iQuad * 3 +
+                         iDim] =
+                          fe_values_collocation.shape_grad(iNode, iQuad)[iDim];
 
               if (areAllCellsAffine)
                 d_shapeFunctionGradientDataInternalLayoutHost =
@@ -1075,6 +1141,10 @@ namespace dftfe
             d_shapeFunctionGradientDataHost.size());
           d_shapeFunctionGradientData[quadID].copyFrom(
             d_shapeFunctionGradientDataHost);
+          d_collocationShapeFunctionGradientData[quadID].resize(
+            d_collocationShapeFunctionGradientDataHost.size());
+          d_collocationShapeFunctionGradientData[quadID].copyFrom(
+            d_collocationShapeFunctionGradientDataHost);
           d_shapeFunctionGradientDataTranspose[quadID].resize(
             d_shapeFunctionGradientDataTransposeHost.size());
           d_shapeFunctionGradientDataTranspose[quadID].copyFrom(
@@ -1103,7 +1173,13 @@ namespace dftfe
             quadrature,
             dealii::update_jacobians | dealii::update_JxW_values |
               dealii::update_inverse_jacobians);
-
+          dealii::FE_DGQArbitraryNodes<3> fe_dgq(
+            d_matrixFreeDataPtr->get_shape_info(d_dofHandlerID, quadID)
+              .get_shape_data()
+              .quadrature);
+          dealii::FEValues<3> fe_values_collocation(fe_dgq,
+                                                    quadrature,
+                                                    dealii::update_gradients);
           dealii::FEValues<3> fe_values_reference(
             d_matrixFreeDataPtr->get_dof_handler(d_dofHandlerID).get_fe(),
             quadrature,
@@ -1111,6 +1187,8 @@ namespace dftfe
           dealii::Triangulation<3> reference_cell;
           dealii::GridGenerator::hyper_cube(reference_cell, 0., 1.);
           fe_values_reference.reinit(reference_cell.begin());
+          if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+            fe_values_collocation.reinit(reference_cell.begin());
 #if defined(DFTFE_WITH_DEVICE)
           dftfe::utils::MemoryStorage<ValueTypeBasisData,
                                       dftfe::utils::MemorySpace::HOST>
@@ -1129,6 +1207,9 @@ namespace dftfe
             d_shapeFunctionGradientDataHost;
           dftfe::utils::MemoryStorage<ValueTypeBasisData,
                                       dftfe::utils::MemorySpace::HOST>
+            d_collocationShapeFunctionGradientDataHost;
+          dftfe::utils::MemoryStorage<ValueTypeBasisData,
+                                      dftfe::utils::MemorySpace::HOST>
             d_shapeFunctionGradientDataTransposeHost;
 #else
           auto &d_inverseJacobianDataHost =
@@ -1139,6 +1220,8 @@ namespace dftfe
             d_shapeFunctionBasisDataTranspose[quadID];
           auto &d_shapeFunctionGradientDataHost =
             d_shapeFunctionGradientBasisData[quadID];
+          auto &d_collocationShapeFunctionGradientDataHost =
+            d_collocationShapeFunctionGradientBasisData[quadID];
           auto &d_shapeFunctionGradientDataTransposeHost =
             d_shapeFunctionGradientBasisDataTranspose[quadID];
 #endif
@@ -1155,11 +1238,16 @@ namespace dftfe
             d_shapeFunctionDataTransposeHost.resize(
               d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell, 0.0);
           d_shapeFunctionGradientDataHost.clear();
+          d_collocationShapeFunctionGradientDataHost.clear();
           d_shapeFunctionGradientDataTransposeHost.clear();
           if (d_updateFlags[iQuadIndex] & update_gradients)
             {
               d_shapeFunctionGradientDataHost.resize(
                 d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell * 3, 0.0);
+              if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+                d_collocationShapeFunctionGradientDataHost.resize(
+                  d_nQuadsPerCell[iQuadIndex] * d_nQuadsPerCell[iQuadIndex] * 3,
+                  0.0);
               if (d_updateFlags[iQuadIndex] & update_transpose)
                 d_shapeFunctionGradientDataTransposeHost.resize(
                   d_nQuadsPerCell[iQuadIndex] * d_nDofsPerCell * 3, 0.0);
@@ -1220,6 +1308,18 @@ namespace dftfe
                           shape_grad_reference[iDim];
                 }
 
+          if (d_updateFlags[iQuadIndex] & update_gradients)
+            if (d_updateFlags[iQuadIndex] & update_collocation_gradients)
+              for (unsigned int iNode = 0; iNode < d_nQuadsPerCell[iQuadIndex];
+                   ++iNode)
+                for (unsigned int iQuad = 0;
+                     iQuad < d_nQuadsPerCell[iQuadIndex];
+                     ++iQuad)
+                  for (unsigned int iDim = 0; iDim < 3; ++iDim)
+                    d_collocationShapeFunctionGradientDataHost
+                      [iNode * d_nQuadsPerCell[iQuadIndex] * 3 + iQuad * 3 +
+                       iDim] =
+                        fe_values_collocation.shape_grad(iNode, iQuad)[iDim];
 
           auto cellPtr =
             d_matrixFreeDataPtr->get_dof_handler(d_dofHandlerID).begin_active();
@@ -1278,6 +1378,10 @@ namespace dftfe
             d_shapeFunctionGradientDataHost.size());
           d_shapeFunctionGradientBasisData[quadID].copyFrom(
             d_shapeFunctionGradientDataHost);
+          d_collocationShapeFunctionGradientBasisData[quadID].resize(
+            d_collocationShapeFunctionGradientDataHost.size());
+          d_collocationShapeFunctionGradientBasisData[quadID].copyFrom(
+            d_collocationShapeFunctionGradientDataHost);
           d_shapeFunctionGradientBasisDataTranspose[quadID].resize(
             d_shapeFunctionGradientDataTransposeHost.size());
           d_shapeFunctionGradientBasisDataTranspose[quadID].copyFrom(
@@ -1457,12 +1561,17 @@ namespace dftfe
         {
           std::pair<unsigned int, unsigned int> cellRange(
             iCell, std::min(iCell + d_cellsBlockSize, cellRangeTotal.second));
-          d_BLASWrapperPtr->stridedBlockScaleCopyConstantStride(
+          d_BLASWrapperPtr->stridedCopyToBlock(nQuadsPerCell * nDofsPerCell,
+                                               (cellRange.second -
+                                                cellRange.first),
+                                               shapeFunctionBasisData().data(),
+                                               tempCellValuesBlock.data(),
+                                               zeroIndexVec.data());
+          d_BLASWrapperPtr->stridedBlockScale(
             nDofsPerCell,
             nQuadsPerCell * (cellRange.second - cellRange.first),
             scalarCoeffAlpha,
             weights.data() + cellRange.first * nQuadsPerCell,
-            shapeFunctionBasisData().data(),
             tempCellValuesBlock.data());
           d_BLASWrapperPtr->xgemmStridedBatched(
             'N',

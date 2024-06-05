@@ -208,29 +208,36 @@ namespace dftfe
                                          iQuad * numVectors * 2 + numVectors +
                                          iVec];
                   gradRhoCellsWfcContributions[0 * numberEntries * 3 +
-                                               index * 3 + iDim] =
+                                               iCell * numEntriesPerCell * 3 +
+                                               iQuad * numVectors * 3 +
+                                               iDim * numVectors + iVec] =
                     2.0 *
                     dftfe::utils::realPartDevice(dftfe::utils::add(
                       dftfe::utils::mult(dftfe::utils::conj(psiUp), gradPsiUp),
                       dftfe::utils::mult(dftfe::utils::conj(psiDown),
                                          gradPsiDown)));
-
                   gradRhoCellsWfcContributions[1 * numberEntries * 3 +
-                                               index * 3 + iDim] =
+                                               iCell * numEntriesPerCell * 3 +
+                                               iQuad * numVectors * 3 +
+                                               iDim * numVectors + iVec] =
                     2.0 *
                     dftfe::utils::realPartDevice(dftfe::utils::sub(
                       dftfe::utils::mult(dftfe::utils::conj(psiUp), gradPsiUp),
                       dftfe::utils::mult(dftfe::utils::conj(psiDown),
                                          gradPsiDown)));
                   gradRhoCellsWfcContributions[2 * numberEntries * 3 +
-                                               index * 3 + iDim] =
+                                               iCell * numEntriesPerCell * 3 +
+                                               iQuad * numVectors * 3 +
+                                               iDim * numVectors + iVec] =
                     2.0 * dftfe::utils::imagPartDevice(dftfe::utils::add(
                             dftfe::utils::mult(dftfe::utils::conj(gradPsiUp),
                                                psiDown),
                             dftfe::utils::mult(dftfe::utils::conj(psiUp),
                                                gradPsiDown)));
                   gradRhoCellsWfcContributions[3 * numberEntries * 3 +
-                                               index * 3 + iDim] =
+                                               iCell * numEntriesPerCell * 3 +
+                                               iQuad * numVectors * 3 +
+                                               iDim * numVectors + iVec] =
                     2.0 * dftfe::utils::realPartDevice(dftfe::utils::add(
                             dftfe::utils::mult(dftfe::utils::conj(gradPsiUp),
                                                psiDown),

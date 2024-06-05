@@ -92,6 +92,9 @@ namespace dftfe
     std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
       BLASWrapperPtr,
     std::shared_ptr<
+      dftfe::linearAlgebra::BLASWrapper<dftfe::utils::MemorySpace::HOST>>
+      BLASWrapperPtrHost,
+    std::shared_ptr<
       dftfe::basis::FEBasisOperations<dataTypes::number, double, memorySpace>>
       basisOperationsPtr,
     std::shared_ptr<
@@ -112,6 +115,7 @@ namespace dftfe
     , d_spinIndex(0)
     , d_HamiltonianIndex(0)
     , d_BLASWrapperPtr(BLASWrapperPtr)
+    , d_BLASWrapperPtrHost(BLASWrapperPtrHost)
     , d_basisOperationsPtr(basisOperationsPtr)
     , d_basisOperationsPtrHost(basisOperationsPtrHost)
     , d_oncvClassPtr(oncvClassPtr)
@@ -317,6 +321,7 @@ namespace dftfe
       (d_dftParamsPtr->spinPolarized == 0 && !(d_dftParamsPtr->noncolin)) ? 1 :
                                                                             3;
     d_basisOperationsPtrHost->reinit(0, 0, d_densityQuadratureID);
+    d_basisOperationsPtr->reinit(0, 0, d_densityQuadratureID);
     const unsigned int totalLocallyOwnedCells =
       d_basisOperationsPtrHost->nCells();
     const unsigned int numberQuadraturePoints =
@@ -354,20 +359,24 @@ namespace dftfe
 #endif
     d_VeffJxWHost.resize(totalLocallyOwnedCells * numberQuadraturePoints, 0.0);
     d_BeffxJxWHost.resize(d_dftParamsPtr->noncolin ?
-                            3 * totalLocallyOwnedCells *
-                              numberQuadraturePoints :
+                            totalLocallyOwnedCells * numberQuadraturePoints :
                             0,
                           0.0);
     d_BeffyJxWHost.resize(d_dftParamsPtr->noncolin ?
-                            3 * totalLocallyOwnedCells *
-                              numberQuadraturePoints :
+                            totalLocallyOwnedCells * numberQuadraturePoints :
                             0,
                           0.0);
     d_BeffzJxWHost.resize(d_dftParamsPtr->noncolin ?
-                            3 * totalLocallyOwnedCells *
-                              numberQuadraturePoints :
+                            totalLocallyOwnedCells * numberQuadraturePoints :
                             0,
                           0.0);
+    std::vector<double> d_VeffGGA(isGGA ? numberQuadraturePoints : 0, 0.0);
+    std::vector<double> d_BeffxGGA(
+      isGGA && d_dftParamsPtr->noncolin ? numberQuadraturePoints : 0, 0.0);
+    std::vector<double> d_BeffyGGA(
+      isGGA && d_dftParamsPtr->noncolin ? numberQuadraturePoints : 0, 0.0);
+    std::vector<double> d_BeffzGGA(
+      isGGA && d_dftParamsPtr->noncolin ? numberQuadraturePoints : 0, 0.0);
     d_invJacderExcWithSigmaTimesGradRhoJxWHost.resize(
       isGGA ? totalLocallyOwnedCells * numberQuadraturePoints * 3 : 0, 0.0);
     d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost.resize(
@@ -870,34 +879,6 @@ namespace dftfe
                                    iQuad * 3 + iDim] +=
                                   termJac * magAxis[3 * iQuad + 2];
                               }
-                            if (magNorm[iQuad] > 1e-12)
-                              {
-                                const double term2 =
-                                  (magAxis[3 * iQuad + 0] *
-                                     cellGradMagXValues[3 * iQuad + jDim] +
-                                   magAxis[3 * iQuad + 1] *
-                                     cellGradMagYValues[3 * iQuad + jDim] +
-                                   magAxis[3 * iQuad + 2] *
-                                     cellGradMagZValues[3 * iQuad + jDim]);
-                                const double BXTerm =
-                                  (cellGradMagXValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 0]) /
-                                  magNorm[iQuad];
-                                const double BYTerm =
-                                  (cellGradMagYValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 1]) /
-                                  magNorm[iQuad];
-                                const double BZTerm =
-                                  (cellGradMagZValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 2]) /
-                                  magNorm[iQuad];
-                                d_BeffxJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += term * BXTerm;
-                                d_BeffyJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += term * BYTerm;
-                                d_BeffzJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += term * BZTerm;
-                              }
                           }
                       }
                   }
@@ -958,79 +939,94 @@ namespace dftfe
                             d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost
                               [iCell * numberQuadraturePoints * 3 + iQuad * 3 +
                                jDim] = termMinusJac * magAxis[3 * iQuad + 2];
-                            if (magNorm[iQuad] > 1e-12)
-                              {
-                                // const double term2 =
-                                //   (magAxis[3 * iQuad + 0] *
-                                //      cellGradMagXValues[3 * iQuad + jDim] +
-                                //    magAxis[3 * iQuad + 1] *
-                                //      cellGradMagYValues[3 * iQuad + jDim] +
-                                //    magAxis[3 * iQuad + 2] *
-                                //      cellGradMagZValues[3 * iQuad + jDim]);
-                                // const double BXTerm =
-                                //   (cellGradMagXValues[3 * iQuad + jDim] -
-                                //    term2 * magAxis[3 * iQuad + 0]) /
-                                //   magNorm[iQuad];
-                                // const double BYTerm =
-                                //   (cellGradMagYValues[3 * iQuad + jDim] -
-                                //    term2 * magAxis[3 * iQuad + 1]) /
-                                //   magNorm[iQuad];
-                                // const double BZTerm =
-                                //   (cellGradMagZValues[3 * iQuad + jDim] -
-                                //    term2 * magAxis[3 * iQuad + 2]) /
-                                //   magNorm[iQuad];
-                                // d_BeffxJxWHost[iCell * numberQuadraturePoints
-                                // +
-                                //                iQuad] +=
-                                //   (cellGradMagXValues[3 * iQuad + jDim] *
-                                //      termPlus -
-                                //    termMinus * term2 * magAxis[3 * iQuad +
-                                //    0]) /
-                                //   magNorm[iQuad];
-                                // d_BeffyJxWHost[iCell * numberQuadraturePoints
-                                // +
-                                //                iQuad] +=
-                                //   (cellGradMagYValues[3 * iQuad + jDim] *
-                                //      termPlus -
-                                //    termMinus * term2 * magAxis[3 * iQuad +
-                                //    1]) /
-                                //   magNorm[iQuad];
-                                // d_BeffzJxWHost[iCell * numberQuadraturePoints
-                                // +
-                                //                iQuad] +=
-                                //   (cellGradMagZValues[3 * iQuad + jDim] *
-                                //      termPlus -
-                                //    termMinus * term2 * magAxis[3 * iQuad +
-                                //    2]) /
-                                //   magNorm[iQuad];
-                                const double term2 =
-                                  (magAxis[3 * iQuad + 0] *
-                                     cellGradMagXValues[3 * iQuad + jDim] +
-                                   magAxis[3 * iQuad + 1] *
-                                     cellGradMagYValues[3 * iQuad + jDim] +
-                                   magAxis[3 * iQuad + 2] *
-                                     cellGradMagZValues[3 * iQuad + jDim]);
-                                const double BXTerm =
-                                  (cellGradMagXValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 0]) /
-                                  magNorm[iQuad];
-                                const double BYTerm =
-                                  (cellGradMagYValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 1]) /
-                                  magNorm[iQuad];
-                                const double BZTerm =
-                                  (cellGradMagZValues[3 * iQuad + jDim] -
-                                   term2 * magAxis[3 * iQuad + 2]) /
-                                  magNorm[iQuad];
-                                d_BeffxJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += termMinus * BXTerm;
-                                d_BeffyJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += termMinus * BYTerm;
-                                d_BeffzJxWHost[iCell * numberQuadraturePoints +
-                                               iQuad] += termMinus * BZTerm;
-                              }
                           }
                       }
+                  }
+                const double scalarCoeffOne  = 1.0;
+                const double scalarCoeffZero = 0.0;
+                d_BLASWrapperPtrHost->xgemm(
+                  'T',
+                  'N',
+                  numberQuadraturePoints,
+                  1,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffOne,
+                  d_basisOperationsPtrHost
+                    ->collocationShapeFunctionGradientBasisData()
+                    .data(),
+                  3 * numberQuadraturePoints,
+                  d_invJacderExcWithSigmaTimesGradRhoJxWHost.data() +
+                    iCell * numberQuadraturePoints * 3,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffZero,
+                  d_VeffGGA.data(),
+                  numberQuadraturePoints);
+                d_BLASWrapperPtrHost->xgemm(
+                  'T',
+                  'N',
+                  numberQuadraturePoints,
+                  1,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffOne,
+                  d_basisOperationsPtrHost
+                    ->collocationShapeFunctionGradientBasisData()
+                    .data(),
+                  3 * numberQuadraturePoints,
+                  d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxWHost.data() +
+                    iCell * numberQuadraturePoints * 3,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffZero,
+                  d_BeffxGGA.data(),
+                  numberQuadraturePoints);
+                d_BLASWrapperPtrHost->xgemm(
+                  'T',
+                  'N',
+                  numberQuadraturePoints,
+                  1,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffOne,
+                  d_basisOperationsPtrHost
+                    ->collocationShapeFunctionGradientBasisData()
+                    .data(),
+                  3 * numberQuadraturePoints,
+                  d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxWHost.data() +
+                    iCell * numberQuadraturePoints * 3,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffZero,
+                  d_BeffyGGA.data(),
+                  numberQuadraturePoints);
+                d_BLASWrapperPtrHost->xgemm(
+                  'T',
+                  'N',
+                  numberQuadraturePoints,
+                  1,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffOne,
+                  d_basisOperationsPtrHost
+                    ->collocationShapeFunctionGradientBasisData()
+                    .data(),
+                  3 * numberQuadraturePoints,
+                  d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxWHost.data() +
+                    iCell * numberQuadraturePoints * 3,
+                  3 * numberQuadraturePoints,
+                  &scalarCoeffZero,
+                  d_BeffzGGA.data(),
+                  numberQuadraturePoints);
+                for (unsigned int iQuad = 0; iQuad < numberQuadraturePoints;
+                     ++iQuad)
+                  {
+                    const double temp =
+                      magAxis[3 * iQuad + 0] * d_BeffxGGA[iQuad] +
+                      magAxis[3 * iQuad + 1] * d_BeffyGGA[iQuad] +
+                      magAxis[3 * iQuad + 2] * d_BeffzGGA[iQuad];
+                    d_VeffJxWHost[iCell * numberQuadraturePoints + iQuad] +=
+                      d_VeffGGA[iQuad];
+                    d_BeffxJxWHost[iCell * numberQuadraturePoints + iQuad] +=
+                      temp * magAxis[3 * iQuad + 0];
+                    d_BeffyJxWHost[iCell * numberQuadraturePoints + iQuad] +=
+                      temp * magAxis[3 * iQuad + 1];
+                    d_BeffzJxWHost[iCell * numberQuadraturePoints + iQuad] +=
+                      temp * magAxis[3 * iQuad + 2];
                   }
               }
           }
@@ -1299,12 +1295,6 @@ namespace dftfe
           }
         d_basisOperationsPtr->computeWeightedCellMassMatrix(
           cellRange, d_VeffJxW, tempHamMatrixRealBlock);
-        if (d_excManagerPtr->getDensityBasedFamilyType() ==
-            densityFamilyType::GGA)
-          d_basisOperationsPtr->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
-            cellRange,
-            d_invJacderExcWithSigmaTimesGradRhoJxW,
-            tempHamMatrixRealBlock);
         if (d_dftParamsPtr->noncolin)
           {
             tempHamMatrixBZBlockNonCollin.setValue(0.0);
@@ -1316,26 +1306,16 @@ namespace dftfe
               cellRange, d_BeffyJxW, tempHamMatrixBYBlockNonCollin);
             d_basisOperationsPtr->computeWeightedCellMassMatrix(
               cellRange, d_BeffxJxW, tempHamMatrixBXBlockNonCollin);
-
+          }
+        else
+          {
             if (d_excManagerPtr->getDensityBasedFamilyType() ==
                 densityFamilyType::GGA)
-              {
-                d_basisOperationsPtr
-                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
-                    cellRange,
-                    d_invJacderExcWithSigmaTimesMagZTimesGradRhoJxW,
-                    tempHamMatrixBZBlockNonCollin);
-                d_basisOperationsPtr
-                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
-                    cellRange,
-                    d_invJacderExcWithSigmaTimesMagYTimesGradRhoJxW,
-                    tempHamMatrixBYBlockNonCollin);
-                d_basisOperationsPtr
-                  ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
-                    cellRange,
-                    d_invJacderExcWithSigmaTimesMagXTimesGradRhoJxW,
-                    tempHamMatrixBXBlockNonCollin);
-              }
+              d_basisOperationsPtr
+                ->computeWeightedCellNjGradNiPlusNiGradNjMatrix(
+                  cellRange,
+                  d_invJacderExcWithSigmaTimesGradRhoJxW,
+                  tempHamMatrixRealBlock);
           }
         if (!onlyHPrimePartForFirstOrderDensityMatResponse)
           d_BLASWrapperPtr->xaxpy(
