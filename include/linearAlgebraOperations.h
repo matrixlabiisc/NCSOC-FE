@@ -994,6 +994,20 @@ namespace dftfe
       const dftParameters &                              dftParams,
       dftfe::ScaLAPACKMatrix<dataTypes::number> &        projHamPar,
       const bool onlyHPrimePartForFirstOrderDensityMatResponse = false);
+    void
+    XtHXXtOXMixedPrec(
+      operatorDFTClass<dftfe::utils::MemorySpace::HOST> &operatorMatrix,
+      const dataTypes::number *                          X,
+      const unsigned int                                 totalNumberComponents,
+      const unsigned int                                 singlePrecComponents,
+      const unsigned int                                 numberLocalDofs,
+      const std::shared_ptr<const dftfe::ProcessGrid> &  processGrid,
+      const MPI_Comm &                                   mpiCommDomain,
+      const MPI_Comm &                                   interBandGroupComm,
+      const dftParameters &                              dftParams,
+      dftfe::ScaLAPACKMatrix<dataTypes::number> &        projHamPar,
+      dftfe::ScaLAPACKMatrix<dataTypes::number> &        projOverlapPar,
+      const bool onlyHPrimePartForFirstOrderDensityMatResponse = false);
 
 
     /**
