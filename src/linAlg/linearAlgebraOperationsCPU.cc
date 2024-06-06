@@ -489,16 +489,16 @@ namespace dftfe
           //               dftParams,
           //               overlapMatPar);
           XtHXXtOXMixedPrec(operatorMatrix,
-                        X,
-                        numberWaveFunctions,
-                        dftParams.numCoreWfcXtHX,
-                        localVectorSize,
-                        processGrid,
-                        operatorMatrix.getMPICommunicatorDomain(),
-                        interBandGroupComm,
-                        dftParams,
-                        projHamPar,
-                        overlapMatPar);
+                            X,
+                            numberWaveFunctions,
+                            dftParams.numCoreWfcXtHX,
+                            localVectorSize,
+                            processGrid,
+                            operatorMatrix.getMPICommunicatorDomain(),
+                            interBandGroupComm,
+                            dftParams,
+                            projHamPar,
+                            overlapMatPar);
         }
       if (!(dftParams.useMixedPrecCGS_O && useMixedPrec))
         computing_timer.leave_subsection("SConj=X^{T}OXConj, RR GEP step");
@@ -3827,8 +3827,9 @@ namespace dftfe
 
       std::vector<dataTypes::numberFP32> projHamBlockSinglePrec(
         N * vectorsBlockSize, 0.0);
-      std::vector<dataTypes::number> projHamBlockDoublePrec(
-        vectorsBlockSize * vectorsBlockSize, 0.0);
+      std::vector<dataTypes::number> projHamBlockDoublePrec(vectorsBlockSize *
+                                                              vectorsBlockSize,
+                                                            0.0);
       std::vector<dataTypes::number> projHamBlock(N * vectorsBlockSize, 0.0);
 
       std::vector<dataTypes::numberFP32> HXBlockSinglePrec;
@@ -4041,10 +4042,10 @@ namespace dftfe
               const unsigned int DRem = D - B;
               if (DRem != 0)
                 {
-              const dataTypes::numberFP32 alphaSinglePrec =
-                                            dataTypes::numberFP32(1.0),
-                                          betaSinglePrec =
-                                            dataTypes::numberFP32(0.0);
+                  const dataTypes::numberFP32 alphaSinglePrec =
+                                                dataTypes::numberFP32(1.0),
+                                              betaSinglePrec =
+                                                dataTypes::numberFP32(0.0);
                   for (unsigned int i = 0; i < numberDofs * B; ++i)
                     HXBlockSinglePrec[i] = HXBlock->data()[i];
                   xgemm(&transA,
@@ -4067,8 +4068,7 @@ namespace dftfe
               MPI_Allreduce(MPI_IN_PLACE,
                             &projHamBlockDoublePrec[0],
                             B * B,
-                            dataTypes::mpi_type_id(
-                              &projHamBlockDoublePrec[0]),
+                            dataTypes::mpi_type_id(&projHamBlockDoublePrec[0]),
                             MPI_SUM,
                             mpiCommDomain);
 
@@ -4077,16 +4077,14 @@ namespace dftfe
               MPI_Allreduce(MPI_IN_PLACE,
                             &projHamBlockSinglePrec[0],
                             DRem * B,
-                            dataTypes::mpi_type_id(
-                              &projHamBlockSinglePrec[0]),
+                            dataTypes::mpi_type_id(&projHamBlockSinglePrec[0]),
                             MPI_SUM,
                             mpiCommDomain);
 
               for (unsigned int i = 0; i < B; ++i)
                 {
                   for (unsigned int j = 0; j < B; ++j)
-                    projHamBlock[i * D + j] =
-                      projHamBlockDoublePrec[i * B + j];
+                    projHamBlock[i * D + j] = projHamBlockDoublePrec[i * B + j];
 
                   for (unsigned int j = 0; j < DRem; ++j)
                     projHamBlock[i * D + j + B] =

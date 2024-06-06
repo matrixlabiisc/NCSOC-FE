@@ -574,7 +574,7 @@ namespace dftfe
       sigma                           = e / (a0 - c);
       sigma1                          = sigma;
       gamma                           = 2.0 / sigma1;
-      const unsigned int numEigVals   = eigenvalues.size()/2;
+      const unsigned int numEigVals   = eigenvalues.size() / 2;
       const unsigned int spinorFactor = X1.numVectors() / numEigVals;
 
       dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::DEVICE>
@@ -688,8 +688,7 @@ namespace dftfe
                                     -1.0,
                                     Y2.data(),
                                     X2.data(),
-                                    eigenValuesFiltered.data() +
-                                      numEigVals,
+                                    eigenValuesFiltered.data() + numEigVals,
                                     Y2.data());
               BLASWrapperPtr->copyValueType1ArrToValueType2Arr(
                 X2.locallyOwnedSize() * X2.numVectors(),
@@ -708,8 +707,7 @@ namespace dftfe
                                     alpha1Old,
                                     X2_SP.data(),
                                     Y2.data(),
-                                    eigenValuesFiltered2.data() +
-                                      numEigVals,
+                                    eigenValuesFiltered2.data() + numEigVals,
                                     X2_SP.data());
               BLASWrapperPtr->axpby(eigenValuesFiltered2.size(),
                                     -c * alpha1Old,
@@ -790,8 +788,7 @@ namespace dftfe
                                     alpha1,
                                     X2_SP.data(),
                                     Y2.data(),
-                                    eigenValuesFiltered2.data() +
-                                      numEigVals,
+                                    eigenValuesFiltered2.data() + numEigVals,
                                     X2_SP.data());
               BLASWrapperPtr->axpby(eigenValuesFiltered2.size(),
                                     -c * alpha1,
