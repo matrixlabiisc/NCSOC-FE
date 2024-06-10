@@ -268,12 +268,6 @@ namespace dftfe
           if (processGrid->is_process_active())
             {
               int error;
-              elpa_store_settings(elpaScala.getElpaHandle(),
-                                  "save_to_disk.txt",
-                                  &error);
-              AssertThrow(error == ELPA_OK,
-                          dealii::ExcMessage(
-                            "DFT-FE Error: elpa_store_settings error."));
               elpa_eigenvectors(elpaScala.getElpaHandle(),
                                 &projHamPar.local_el(0, 0),
                                 &eigenValues[0],
@@ -533,10 +527,6 @@ namespace dftfe
                   AssertThrow(error == ELPA_OK,
                               dealii::ExcMessage("DFT-FE Error: ELPA Error."));
 #endif
-                  /* Setup */
-                  AssertThrow(elpa_setup_gpu(elpaScala.getElpaHandle()) ==
-                                ELPA_OK,
-                              dealii::ExcMessage("DFT-FE Error: ELPA Error."));
                 }
 
               elpa_cholesky(elpaScala.getElpaHandle(),
@@ -557,6 +547,10 @@ namespace dftfe
                   AssertThrow(error == ELPA_OK,
                               dealii::ExcMessage("DFT-FE Error: ELPA Error."));
 #endif
+                  /* Setup */
+                  AssertThrow(elpa_setup_gpu(elpaScala.getElpaHandle()) ==
+                                ELPA_OK,
+                              dealii::ExcMessage("DFT-FE Error: ELPA Error."));
                 }
             }
           overlapMatPar.copy_conjugate_transposed(overlapMatParConjTrans);
