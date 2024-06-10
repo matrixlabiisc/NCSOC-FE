@@ -547,10 +547,6 @@ namespace dftfe
                   AssertThrow(error == ELPA_OK,
                               dealii::ExcMessage("DFT-FE Error: ELPA Error."));
 #endif
-                  /* Setup */
-                  AssertThrow(elpa_setup_gpu(elpaScala.getElpaHandle()) ==
-                                ELPA_OK,
-                              dealii::ExcMessage("DFT-FE Error: ELPA Error."));
                 }
             }
           overlapMatPar.copy_conjugate_transposed(overlapMatParConjTrans);
