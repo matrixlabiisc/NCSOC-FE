@@ -1252,7 +1252,7 @@ namespace dftfe
                  i++)
               {
                 d_densityInNodalValues[1].local_element(i) =
-                  d_magInNodalValuesRead.local_element(i);
+                  d_magZInNodalValuesRead.local_element(i);
               }
 
             interpolateDensityNodalDataToQuadratureDataGeneral(
@@ -1265,6 +1265,34 @@ namespace dftfe
               d_gradDensityInQuadValues[1],
               d_excManagerPtr->getDensityBasedFamilyType() ==
                 densityFamilyType::GGA);
+          }
+        else if (d_dftParamsPtr->noncolin)
+          {
+            d_densityInNodalValues[1] = 0;
+            d_densityInNodalValues[2] = 0;
+            d_densityInNodalValues[3] = 0;
+            for (unsigned int i = 0; i < d_densityInNodalValues[1].local_size();
+                 i++)
+              {
+                d_densityInNodalValues[1].local_element(i) =
+                  d_magZInNodalValuesRead.local_element(i);
+                d_densityInNodalValues[2].local_element(i) =
+                  d_magYInNodalValuesRead.local_element(i);
+                d_densityInNodalValues[3].local_element(i) =
+                  d_magXInNodalValuesRead.local_element(i);
+              }
+
+            for (unsigned int iComp = 1; iComp < 4; ++iComp)
+              interpolateDensityNodalDataToQuadratureDataGeneral(
+                d_basisOperationsPtrElectroHost,
+                d_densityDofHandlerIndexElectro,
+                d_densityQuadratureIdElectro,
+                d_densityInNodalValues[iComp],
+                d_densityInQuadValues[iComp],
+                d_gradDensityInQuadValues[iComp],
+                d_gradDensityInQuadValues[iComp],
+                d_excManagerPtr->getDensityBasedFamilyType() ==
+                  densityFamilyType::GGA);
           }
         if ((d_dftParamsPtr->solverMode == "GEOOPT"))
           {

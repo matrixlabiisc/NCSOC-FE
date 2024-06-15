@@ -1453,7 +1453,8 @@ namespace dftfe
       d_rhoOutNodalValuesDistributed;
 
 
-    distributedCPUVec<double> d_magInNodalValuesRead;
+    distributedCPUVec<double> d_magZInNodalValuesRead, d_magYInNodalValuesRead,
+      d_magXInNodalValuesRead;
 
 
     dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
