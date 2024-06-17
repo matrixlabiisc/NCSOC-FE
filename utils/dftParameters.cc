@@ -153,7 +153,7 @@ namespace dftfe
           "WRITE BANDS",
           "false",
           dealii::Patterns::Bool(),
-          "[Standard] Write bands for every k-point to an outputfile called 'bands.out' in the units of Ha. This can be used after GS (Ground-state) or NSCF (Non-Self consistent field iteration) modes of solve. This option is by default on for NSCF mode of solve. Outputs a file name 'bands.out'. The first line has 3 entries with first one denoting the number of k-points and second entry denoting the number of eigenvalues(bands) for each k-point and third the fermi energy in Ha. Subsequent lines have 4 columns with first column indicating the k-point index, second column indicating band index, third column indicating corresponding eigenvalue and fourth column indicating the corresponding occupation number.");
+          "[Standard] Write bands for every k-point to an outputfile called 'bands.out' in the units of Ha. This can be used after GS (Ground-state) or NSCF (Non-Self consistent field iteration) modes of solve. If it is set to true, Fermi energy is obtained from 'fermiEnergy.out' file, created from previous GS calculation with 'SAVE RHO DATA' set to true. Outputs a file name 'bands.out'. The first line has 2 entries with first one denoting the number of k-points and second entry denoting the number of eigenvalues(bands) for each k-point. Subsequent lines have 4 columns with first column indicating the k-point index, second column indicating band index, third column indicating corresponding eigenvalue and fourth column indicating the corresponding occupation number.");
       }
       prm.leave_subsection();
 
@@ -191,7 +191,7 @@ namespace dftfe
           "SAVE RHO DATA",
           "false",
           dealii::Patterns::Bool(),
-          "[Standard] Saves charge density and mesh triagulation data for restart, if SOLVER MODE is GS then the save is done every 10 scf iterations, otherwise it is done after each converged scf solve.");
+          "[Standard] Saves charge density and mesh triagulation data for restart, if SOLVER MODE is GS then the save is done every 10 scf iterations, otherwise it is done after each converged scf solve. If the value is 'true', the SOLVER MODE is GS and if the SCF loop converges, an outputfile 'fermiEnergy.out' is written that contains the fermi energy in the units of Ha. This Fermi energy is used when 'WRITE BANDS' is true");
 
         prm.declare_entry(
           "LOAD RHO DATA",
@@ -817,7 +817,7 @@ namespace dftfe
           "USE ENERGY RESIDUAL METRIC",
           "false",
           dealii::Patterns::Bool(),
-          "[Advanced] Boolean parameter specifying whether to use the energy residual metric for convergence check. Setting it to false can lead to some computational time savings. Default value is false");
+          "[Advanced] Boolean parameter specifying whether to use the energy residual metric (equation 7.23 of Richard Matrin second edition) for convergence check. Setting it to false can lead to some computational time savings. Default value is false");
 
 
         prm.enter_subsection("LOW RANK DIELECM PRECOND");
@@ -996,7 +996,7 @@ namespace dftfe
             "USE SINGLE PREC COMMUN CHEBY",
             "false",
             dealii::Patterns::Bool(),
-            "[Advanced] Use single precision communication in Chebyshev filtering. Currently this option is only available if USE ELPA=true for which DFT-FE also has to be linked to ELPA library. Default setting is false.");
+            "[Advanced] Use single precision communication in Chebyshev filtering. Default setting is false.");
 
           prm.declare_entry(
             "USE MIXED PREC COMMUN ONLY XTX XTHX",
@@ -1293,7 +1293,7 @@ namespace dftfe
     useDevice                                      = false;
     deviceFineGrainedTimings                       = false;
     allowFullCPUMemSubspaceRot                     = true;
-    useMixedPrecCheby                              = false;
+    useSinglePrecCommunCheby                       = false;
     overlapComputeCommunCheby                      = false;
     overlapComputeCommunOrthoRR                    = false;
     autoDeviceBlockSizes                           = true;
@@ -1637,8 +1637,8 @@ namespace dftfe
         useMixedPrecSubspaceRotRR = prm.get_bool("USE MIXED PREC RR_SR");
         useMixedPrecCommunOnlyXTHXCGSO =
           prm.get_bool("USE MIXED PREC COMMUN ONLY XTX XTHX");
-        useMixedPrecCheby  = prm.get_bool("USE SINGLE PREC COMMUN CHEBY");
-        useSinglePrecCheby = prm.get_bool("USE SINGLE PREC CHEBY");
+        useSinglePrecCommunCheby = prm.get_bool("USE SINGLE PREC COMMUN CHEBY");
+        useSinglePrecCheby       = prm.get_bool("USE SINGLE PREC CHEBY");
         overlapComputeCommunCheby =
           prm.get_bool("OVERLAP COMPUTE COMMUN CHEBY");
         overlapComputeCommunOrthoRR =
@@ -1963,7 +1963,7 @@ namespace dftfe
         useMixedPrecCGS_O                   = true;
         useMixedPrecCGS_SR                  = true;
         useMixedPrecXTHXSpectrumSplit       = true;
-        useMixedPrecCheby                   = true;
+        useSinglePrecCommunCheby            = true;
         reuseLanczosUpperBoundFromFirstCall = true;
       }
 
@@ -1998,12 +1998,6 @@ namespace dftfe
 #if !defined(DFTFE_WITH_DEVICE_AWARE_MPI)
     useDeviceDirectAllReduce = useDCCL && useDeviceDirectAllReduce;
 #endif
-
-    if (useMixedPrecCheby)
-      AssertThrow(
-        useELPA,
-        dealii::ExcMessage(
-          "DFT-FE Error: USE ELPA must be set to true for USE SINGLE PREC COMMUN CHEBY."));
 
     if (verbosity >= 5)
       computeEnergyEverySCF = true;

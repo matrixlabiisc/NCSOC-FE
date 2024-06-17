@@ -1234,6 +1234,15 @@ namespace dftfe
   }
 
   template <dftfe::utils::MemorySpace memorySpace>
+  dftfe::linearAlgebra::MultiVector<dataTypes::numberFP32, memorySpace> &
+  KohnShamHamiltonianOperator<memorySpace>::getScratchFEMultivectorSinglePrec(
+    const unsigned int numVectors,
+    const unsigned int index)
+  {
+    return d_basisOperationsPtr->getMultiVectorSinglePrec(numVectors, index);
+  }
+
+  template <dftfe::utils::MemorySpace memorySpace>
   void
   KohnShamHamiltonianOperator<
     memorySpace>::computeCellHamiltonianMatrixExtPotContribution()

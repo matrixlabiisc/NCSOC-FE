@@ -429,7 +429,8 @@ namespace dftfe
                       {
                         eigenValuesBlock[i] = eigenValues[jvec + i];
                       }
-                    if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                    if (useMixedPrecOverall &&
+                        d_dftParams.useSinglePrecCommunCheby)
                       {
                         (*XBlock).setCommunicationPrecision(
                           dftfe::utils::mpi::communicationPrecision::single);
@@ -457,7 +458,8 @@ namespace dftfe
                         d_lowerBoundUnWantedSpectrum,
                         d_upperBoundUnWantedSpectrum,
                         d_lowerBoundWantedSpectrum);
-                    if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                    if (useMixedPrecOverall &&
+                        d_dftParams.useSinglePrecCommunCheby)
                       {
                         (*XBlock).setCommunicationPrecision(
                           dftfe::utils::mpi::communicationPrecision::full);
@@ -475,7 +477,8 @@ namespace dftfe
                       {
                         eigenValuesBlock[i] = eigenValues[jvec + i];
                       }
-                    if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                    if (useMixedPrecOverall &&
+                        d_dftParams.useSinglePrecCommunCheby)
                       {
                         (*XBlock).setCommunicationPrecision(
                           dftfe::utils::mpi::communicationPrecision::single);
@@ -495,7 +498,8 @@ namespace dftfe
                       d_upperBoundUnWantedSpectrum,
                       d_lowerBoundWantedSpectrum);
 
-                    if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                    if (useMixedPrecOverall &&
+                        d_dftParams.useSinglePrecCommunCheby)
                       {
                         (*XBlock).setCommunicationPrecision(
                           dftfe::utils::mpi::communicationPrecision::full);
@@ -507,7 +511,7 @@ namespace dftfe
             else if (d_dftParams.overlapComputeCommunCheby &&
                      numSimultaneousBlocksCurrent == 2)
               {
-                if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                if (useMixedPrecOverall && d_dftParams.useSinglePrecCommunCheby)
                   {
                     (*XBlock).setCommunicationPrecision(
                       dftfe::utils::mpi::communicationPrecision::single);
@@ -529,7 +533,7 @@ namespace dftfe
                     d_lowerBoundUnWantedSpectrum,
                     d_upperBoundUnWantedSpectrum,
                     d_lowerBoundWantedSpectrum);
-                if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                if (useMixedPrecOverall && d_dftParams.useSinglePrecCommunCheby)
                   {
                     (*XBlock).setCommunicationPrecision(
                       dftfe::utils::mpi::communicationPrecision::full);
@@ -543,7 +547,7 @@ namespace dftfe
               }
             else
               {
-                if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                if (useMixedPrecOverall && d_dftParams.useSinglePrecCommunCheby)
                   {
                     (*XBlock).setCommunicationPrecision(
                       dftfe::utils::mpi::communicationPrecision::single);
@@ -558,7 +562,7 @@ namespace dftfe
                   d_lowerBoundUnWantedSpectrum,
                   d_upperBoundUnWantedSpectrum,
                   d_lowerBoundWantedSpectrum);
-                if (useMixedPrecOverall && d_dftParams.useMixedPrecCheby)
+                if (useMixedPrecOverall && d_dftParams.useSinglePrecCommunCheby)
                   {
                     (*XBlock).setCommunicationPrecision(
                       dftfe::utils::mpi::communicationPrecision::full);
@@ -1005,7 +1009,7 @@ namespace dftfe
                         numSimultaneousBlocksCurrent == 2)
                       {
                         if (useMixedPrecOverall &&
-                            d_dftParams.useMixedPrecCheby)
+                            d_dftParams.useSinglePrecCommunCheby)
                           {
                             (*XBlock).setCommunicationPrecision(
                               dftfe::utils::mpi::communicationPrecision::
@@ -1033,7 +1037,7 @@ namespace dftfe
                             d_upperBoundUnWantedSpectrum,
                             d_lowerBoundWantedSpectrum);
                         if (useMixedPrecOverall &&
-                            d_dftParams.useMixedPrecCheby)
+                            d_dftParams.useSinglePrecCommunCheby)
                           {
                             (*XBlock).setCommunicationPrecision(
                               dftfe::utils::mpi::communicationPrecision::full);
@@ -1048,7 +1052,7 @@ namespace dftfe
                     else
                       {
                         if (useMixedPrecOverall &&
-                            d_dftParams.useMixedPrecCheby)
+                            d_dftParams.useSinglePrecCommunCheby)
                           {
                             (*XBlock).setCommunicationPrecision(
                               dftfe::utils::mpi::communicationPrecision::
@@ -1066,7 +1070,7 @@ namespace dftfe
                           d_upperBoundUnWantedSpectrum,
                           d_lowerBoundWantedSpectrum);
                         if (useMixedPrecOverall &&
-                            d_dftParams.useMixedPrecCheby)
+                            d_dftParams.useSinglePrecCommunCheby)
                           {
                             (*XBlock).setCommunicationPrecision(
                               dftfe::utils::mpi::communicationPrecision::full);

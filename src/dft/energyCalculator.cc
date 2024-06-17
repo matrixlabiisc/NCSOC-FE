@@ -178,7 +178,7 @@ namespace dftfe
           pcout << std::endl << "Energy computations (Hartree) " << std::endl;
           pcout << "-------------------" << std::endl;
           if (dftParams.useMixedPrecCGS_O || dftParams.useMixedPrecCGS_SR ||
-              dftParams.useMixedPrecCheby)
+              dftParams.useSinglePrecCommunCheby)
             pcout << std::setw(25) << "Total energy"
                   << ": " << std::fixed << std::setprecision(6) << std::setw(20)
                   << totalEnergyTrunc << std::endl;
@@ -795,7 +795,8 @@ namespace dftfe
     return totalEnergy;
   }
 
-  // compute energies
+  // compute energie residual,
+  // E_KS-E_HWF=\int(V_{in}(\rho_{out}-\rho_{in}))+E_{pot}[\rho_{out}]-E_{pot}[\rho_{in}]
   double
   energyCalculator::computeEnergyResidual(
     const std::shared_ptr<
