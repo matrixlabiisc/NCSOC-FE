@@ -1084,21 +1084,6 @@ namespace dftfe
             ValueType4 *       C) const;
 
 
-      template <typename ValueType0,
-                typename ValueType1,
-                typename ValueType2,
-                typename ValueType3,
-                typename ValueType4>
-      void
-      ApaBD(const unsigned int m,
-            const unsigned int n,
-            const ValueType0   alpha,
-            const ValueType1 * A,
-            const ValueType2 * B,
-            const ValueType3 * D,
-            ValueType4 *       C) const;
-
-
       template <typename ValueType>
       void
       axpyStridedBlockAtomicAdd(const dftfe::size_type contiguousBlockSize,
