@@ -1472,7 +1472,8 @@ namespace dftfe
         d_ONCVnonLocalOperator->applyAllReduceOnCconjtransX(
           d_ONCVNonLocalProjectorTimesVectorBlock);
         d_ONCVnonLocalOperator->applyVOnCconjtransX(
-          CouplingStructure::diagonal,
+          d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
+                                     CouplingStructure::diagonal,
           d_oncvClassPtr->getCouplingMatrix(),
           d_ONCVNonLocalProjectorTimesVectorBlock,
           true);
@@ -1728,7 +1729,8 @@ namespace dftfe
           {
             d_ONCVNonLocalProjectorTimesVectorBlock.updateGhostValuesEnd();
             d_ONCVnonLocalOperator->applyVOnCconjtransX(
-              CouplingStructure::diagonal,
+              d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
+                                         CouplingStructure::diagonal,
               d_oncvClassPtr->getCouplingMatrix(),
               d_ONCVNonLocalProjectorTimesVectorBlock,
               true);
@@ -1889,7 +1891,8 @@ namespace dftfe
             d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
               .updateGhostValuesEnd();
             d_ONCVnonLocalOperatorSinglePrec->applyVOnCconjtransX(
-              CouplingStructure::diagonal,
+              d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
+                                         CouplingStructure::diagonal,
               d_oncvClassPtr->getCouplingMatrixSinglePrec(),
               d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec,
               true);

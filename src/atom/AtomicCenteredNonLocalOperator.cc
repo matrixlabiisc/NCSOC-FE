@@ -1150,6 +1150,12 @@ namespace dftfe
                                                 d_maxSingleAtomContribution,
                                               ValueType(0.0));
 
+        d_couplingMatrixTimesVectorDevice.clear();
+        d_couplingMatrixTimesVectorDevice.resize(atomIdsInProcessor.size() *
+                                                   d_numberWaveFunctions *
+                                                   d_maxSingleAtomContribution,
+                                                 ValueType(0.0));
+
         d_cellHamMatrixTimesWaveMatrixNonLocalDevice.clear();
         d_cellHamMatrixTimesWaveMatrixNonLocalDevice.resize(
           d_numberWaveFunctions * d_totalNonlocalElems *
@@ -1509,23 +1515,6 @@ namespace dftfe
     vec.update_ghost_values();
     d_SphericalFunctionKetTimesVectorPar.resize(1);
     d_SphericalFunctionKetTimesVectorPar[0].reinit(vec);
-    d_atomNumberingMapCurrentProcess.resize(atomIdsInCurrentProcess.size());
-    std::vector<std::pair<unsigned int, unsigned int>> localIds;
-    for (int iAtom = 0; iAtom < atomIdsInCurrentProcess.size(); iAtom++)
-      {
-        const unsigned int atomId = atomIdsInCurrentProcess[iAtom];
-        unsigned int       globalId =
-          d_sphericalFunctionIdsNumberingMapCurrentProcess[std::make_pair(
-            atomId, 0)];
-
-        const unsigned int id = d_SphericalFunctionKetTimesVectorPar[0]
-                                  .get_partitioner()
-                                  ->global_to_local(globalId);
-        localIds.push_back(std::pair<unsigned int, unsigned int>(id, iAtom));
-      }
-    std::sort(localIds.begin(), localIds.end());
-    for (int iAtom = 0; iAtom < atomIdsInCurrentProcess.size(); iAtom++)
-      d_atomNumberingMapCurrentProcess[iAtom] = localIds[iAtom].second;
   }
 
   template <typename ValueType, dftfe::utils::MemorySpace memorySpace>
@@ -1736,6 +1725,44 @@ namespace dftfe
                       }
                   }
               }
+            else if (couplingtype == CouplingStructure::blockDiagonal)
+              {
+                const ValueType one   = 1.0;
+                const ValueType zero  = 0.0;
+                unsigned int    alpha = 0;
+                for (int iAtom = 0; iAtom < d_totalAtomsInCurrentProc; iAtom++)
+                  {
+                    const unsigned int atomId = atomIdsInProc[iAtom];
+                    const unsigned int Znum   = atomicNumber[atomId];
+                    const unsigned int numberSphericalFunctions =
+                      d_atomCenteredSphericalFunctionContainer
+                        ->getTotalNumberOfSphericalFunctionsPerAtom(Znum);
+                    const unsigned int localId =
+                      sphericalFunctionKetTimesVectorParFlattened
+                        .getMPIPatternP2P()
+                        ->globalToLocal(
+                          d_sphericalFunctionIdsNumberingMapCurrentProcess
+                            .find(std::make_pair(atomId, 0))
+                            ->second);
+                    d_BLASWrapperPtr->xgemm(
+                      'N',
+                      'T',
+                      d_numberWaveFunctions / 2,
+                      numberSphericalFunctions * 2,
+                      numberSphericalFunctions * 2,
+                      &one,
+                      sphericalFunctionKetTimesVectorParFlattened.begin() +
+                        localId * d_numberWaveFunctions,
+                      d_numberWaveFunctions / 2,
+                      couplingMatrix.begin() + alpha,
+                      numberSphericalFunctions * 2,
+                      &zero,
+                      &d_sphericalFnTimesWavefunMatrix[atomId][0],
+                      d_numberWaveFunctions / 2);
+                    alpha +=
+                      numberSphericalFunctions * numberSphericalFunctions * 4;
+                  }
+              }
           }
 #if defined(DFTFE_WITH_DEVICE)
         else
@@ -1771,39 +1798,40 @@ namespace dftfe
               }
             else if (couplingtype == CouplingStructure::blockDiagonal)
               {
-                // copyDistributedVectorToPaddedMemoryStorageVector(
-                //   sphericalFunctionKetTimesVectorParFlattened,
-                //   d_sphericalFnTimesVectorDevice);
-                // const ValueType one  = 1.0;
-                // const ValueType zero = 0.0;
+                copyDistributedVectorToPaddedMemoryStorageVector(
+                  sphericalFunctionKetTimesVectorParFlattened,
+                  d_sphericalFnTimesVectorDevice);
+                const ValueType one  = 1.0;
+                const ValueType zero = 0.0;
 
-                // d_BLASWrapperPtr->xgemmStridedBatched(
-                //   'N',
-                //   'T',
-                //   d_numberWaveFunctions / 2,
-                //   d_maxSingleAtomContribution * 2,
-                //   d_maxSingleAtomContribution * 2,
-                //   &one,
-                //   d_sphericalFnTimesVectorDevice.begin(),
-                //   d_numberWaveFunctions / 2,
-                //   d_maxSingleAtomContribution * d_numberWaveFunctions,
-                //   couplingMatrix.begin(),
-                //   d_maxSingleAtomContribution * 2,
-                //   d_maxSingleAtomContribution * d_maxSingleAtomContribution *
-                //   4, &zero, d_couplingMatrixTimesVectorDevice.begin(),
-                //   d_numberWaveFunctions / 2,
-                //   d_maxSingleAtomContribution * d_numberWaveFunctions,
-                //   d_totalAtomsInCurrentProc);
-                // if (flagCopyResultsToMatrix)
-                //   dftfe::AtomicCenteredNonLocalOperatorKernelsDevice::
-                //     copyFromParallelNonLocalVecToAllCellsVec(
-                //       d_numberWaveFunctions,
-                //       d_totalNonlocalElems,
-                //       d_maxSingleAtomContribution,
-                //       d_couplingMatrixTimesVectorDevice.begin(),
-                //       d_sphericalFnTimesVectorAllCellsDevice.begin(),
-                //       d_indexMapFromPaddedNonLocalVecToParallelNonLocalVecDevice
-                //         .begin());
+                d_BLASWrapperPtr->xgemmStridedBatched(
+                  'N',
+                  'T',
+                  d_numberWaveFunctions / 2,
+                  d_maxSingleAtomContribution * 2,
+                  d_maxSingleAtomContribution * 2,
+                  &one,
+                  d_sphericalFnTimesVectorDevice.begin(),
+                  d_numberWaveFunctions / 2,
+                  d_maxSingleAtomContribution * d_numberWaveFunctions,
+                  couplingMatrix.begin(),
+                  d_maxSingleAtomContribution * 2,
+                  d_maxSingleAtomContribution * d_maxSingleAtomContribution * 4,
+                  &zero,
+                  d_couplingMatrixTimesVectorDevice.begin(),
+                  d_numberWaveFunctions / 2,
+                  d_maxSingleAtomContribution * d_numberWaveFunctions,
+                  d_totalAtomsInCurrentProc);
+                if (flagCopyResultsToMatrix)
+                  dftfe::AtomicCenteredNonLocalOperatorKernelsDevice::
+                    copyFromParallelNonLocalVecToAllCellsVec(
+                      d_numberWaveFunctions,
+                      d_totalNonlocalElems,
+                      d_maxSingleAtomContribution,
+                      d_couplingMatrixTimesVectorDevice.begin(),
+                      d_sphericalFnTimesVectorAllCellsDevice.begin(),
+                      d_indexMapFromPaddedNonLocalVecToParallelNonLocalVecDevice
+                        .begin());
               }
           }
 #endif
