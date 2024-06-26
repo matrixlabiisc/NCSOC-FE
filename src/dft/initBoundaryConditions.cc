@@ -318,7 +318,8 @@ namespace dftfe
         unsigned int BVec = std::min(d_dftParamsPtr->chebyWfcBlockSize,
                                      bandGroupLowHighPlusOneIndices[1]);
 
-        const unsigned int numWfnComponents = d_dftParamsPtr->noncolin ? 2 : 1;
+        const unsigned int numWfnComponents =
+          (d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1;
         d_basisOperationsPtrHost->createScratchMultiVectors(numWfnComponents,
                                                             4);
         d_basisOperationsPtrHost->createScratchMultiVectors(BVec *
@@ -372,7 +373,7 @@ namespace dftfe
             const unsigned int BVec =
               std::min(d_dftParamsPtr->chebyWfcBlockSize, d_numEigenValues);
             const unsigned int numWfnComponents =
-              d_dftParamsPtr->noncolin ? 2 : 1;
+              (d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1;
 
             d_basisOperationsPtrDevice->createScratchMultiVectors(
               numWfnComponents, 4);
@@ -436,7 +437,8 @@ namespace dftfe
         d_basisOperationsPtrDevice->clearScratchMultiVectors();
         const unsigned int BVec =
           std::min(d_dftParamsPtr->chebyWfcBlockSize, d_numEigenValues);
-        const unsigned int numWfnComponents = d_dftParamsPtr->noncolin ? 2 : 1;
+        const unsigned int numWfnComponents =
+          (d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1;
 
         d_basisOperationsPtrDevice->createScratchMultiVectors(numWfnComponents,
                                                               4);

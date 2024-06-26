@@ -175,6 +175,7 @@ namespace dftfe
     bool         useELPADeviceKernel;
     bool         memOptMode;
     bool         noncolin;
+    bool         hasSOC;
 
 
     unsigned int dc_dispersioncorrectiontype;

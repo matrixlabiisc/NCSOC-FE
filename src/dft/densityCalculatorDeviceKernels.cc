@@ -158,7 +158,8 @@ namespace dftfe
       dftfe::utils::deviceDoubleComplex *gradwfcContributions,
       double *                           rhoCellsWfcContributions,
       double *                           gradRhoCellsWfcContributions,
-      const bool                         isEvaluateGradRho)
+      const bool                         isEvaluateGradRho,
+      const bool                         isNonCollin)
     {
       const unsigned int globalThreadId = blockIdx.x * blockDim.x + threadIdx.x;
       const unsigned int numEntriesPerCell = numVectors * nQuadsPerCell;
@@ -180,19 +181,20 @@ namespace dftfe
           rhoCellsWfcContributions[index] =
             dftfe::utils::abs(dftfe::utils::mult(psiUp, psiUp)) +
             dftfe::utils::abs(dftfe::utils::mult(psiDown, psiDown));
+          if (isNonCollin)
+            {
+              rhoCellsWfcContributions[numberEntries + index] =
+                dftfe::utils::abs(dftfe::utils::mult(psiUp, psiUp)) -
+                dftfe::utils::abs(dftfe::utils::mult(psiDown, psiDown));
 
-          rhoCellsWfcContributions[numberEntries + index] =
-            dftfe::utils::abs(dftfe::utils::mult(psiUp, psiUp)) -
-            dftfe::utils::abs(dftfe::utils::mult(psiDown, psiDown));
+              rhoCellsWfcContributions[2 * numberEntries + index] =
+                2.0 * dftfe::utils::imagPartDevice(
+                        dftfe::utils::mult(dftfe::utils::conj(psiUp), psiDown));
 
-          rhoCellsWfcContributions[2 * numberEntries + index] =
-            2.0 * dftfe::utils::imagPartDevice(
-                    dftfe::utils::mult(dftfe::utils::conj(psiUp), psiDown));
-
-          rhoCellsWfcContributions[3 * numberEntries + index] =
-            2.0 * dftfe::utils::realPartDevice(
-                    dftfe::utils::mult(dftfe::utils::conj(psiUp), psiDown));
-
+              rhoCellsWfcContributions[3 * numberEntries + index] =
+                2.0 * dftfe::utils::realPartDevice(
+                        dftfe::utils::mult(dftfe::utils::conj(psiUp), psiDown));
+            }
           if (isEvaluateGradRho)
             {
               for (unsigned int iDim = 0; iDim < 3; ++iDim)
@@ -216,33 +218,36 @@ namespace dftfe
                       dftfe::utils::mult(dftfe::utils::conj(psiUp), gradPsiUp),
                       dftfe::utils::mult(dftfe::utils::conj(psiDown),
                                          gradPsiDown)));
-                  gradRhoCellsWfcContributions[1 * numberEntries * 3 +
-                                               iCell * numEntriesPerCell * 3 +
-                                               iQuad * numVectors * 3 +
-                                               iDim * numVectors + iVec] =
-                    2.0 *
-                    dftfe::utils::realPartDevice(dftfe::utils::sub(
-                      dftfe::utils::mult(dftfe::utils::conj(psiUp), gradPsiUp),
-                      dftfe::utils::mult(dftfe::utils::conj(psiDown),
-                                         gradPsiDown)));
-                  gradRhoCellsWfcContributions[2 * numberEntries * 3 +
-                                               iCell * numEntriesPerCell * 3 +
-                                               iQuad * numVectors * 3 +
-                                               iDim * numVectors + iVec] =
-                    2.0 * dftfe::utils::imagPartDevice(dftfe::utils::add(
+                  if (isNonCollin)
+                    {
+                      gradRhoCellsWfcContributions
+                        [1 * numberEntries * 3 + iCell * numEntriesPerCell * 3 +
+                         iQuad * numVectors * 3 + iDim * numVectors + iVec] =
+                          2.0 *
+                          dftfe::utils::realPartDevice(dftfe::utils::sub(
+                            dftfe::utils::mult(dftfe::utils::conj(psiUp),
+                                               gradPsiUp),
+                            dftfe::utils::mult(dftfe::utils::conj(psiDown),
+                                               gradPsiDown)));
+                      gradRhoCellsWfcContributions
+                        [2 * numberEntries * 3 + iCell * numEntriesPerCell * 3 +
+                         iQuad * numVectors * 3 + iDim * numVectors + iVec] =
+                          2.0 *
+                          dftfe::utils::imagPartDevice(dftfe::utils::add(
                             dftfe::utils::mult(dftfe::utils::conj(gradPsiUp),
                                                psiDown),
                             dftfe::utils::mult(dftfe::utils::conj(psiUp),
                                                gradPsiDown)));
-                  gradRhoCellsWfcContributions[3 * numberEntries * 3 +
-                                               iCell * numEntriesPerCell * 3 +
-                                               iQuad * numVectors * 3 +
-                                               iDim * numVectors + iVec] =
-                    2.0 * dftfe::utils::realPartDevice(dftfe::utils::add(
+                      gradRhoCellsWfcContributions
+                        [3 * numberEntries * 3 + iCell * numEntriesPerCell * 3 +
+                         iQuad * numVectors * 3 + iDim * numVectors + iVec] =
+                          2.0 *
+                          dftfe::utils::realPartDevice(dftfe::utils::add(
                             dftfe::utils::mult(dftfe::utils::conj(gradPsiUp),
                                                psiDown),
                             dftfe::utils::mult(dftfe::utils::conj(psiUp),
                                                gradPsiDown)));
+                    }
                 }
             }
         }
@@ -269,7 +274,8 @@ namespace dftfe
     double *                                    rho,
     double *                                    gradRho,
     const bool                                  isEvaluateGradRho,
-    const bool                                  isNonCollin)
+    const bool                                  isNonCollin,
+    const bool                                  hasSOC)
   {
     const unsigned int cellsBlockSize   = cellRange.second - cellRange.first;
     const unsigned int vectorsBlockSize = vecRange.second - vecRange.first;
@@ -280,7 +286,7 @@ namespace dftfe
     const double       scalarCoeffBetaRho      = 1.0;
     const double       scalarCoeffAlphaGradRho = 1.0;
     const double       scalarCoeffBetaGradRho  = 1.0;
-    if (isNonCollin)
+    if (isNonCollin || hasSOC)
       {
 #ifdef DFTFE_WITH_DEVICE_LANG_CUDA
         computeNonCollinRhoGradRhoFromInterpolatedValues<<<
@@ -295,7 +301,8 @@ namespace dftfe
           dftfe::utils::makeDataTypeDeviceCompatible(rhoCellsWfcContributions),
           dftfe::utils::makeDataTypeDeviceCompatible(
             gradRhoCellsWfcContributions),
-          isEvaluateGradRho);
+          isEvaluateGradRho,
+          isNonCollin);
 #elif DFTFE_WITH_DEVICE_LANG_HIP
         hipLaunchKernelGGL(
           computeNonCollinRhoGradRhoFromInterpolatedValues,
@@ -312,7 +319,8 @@ namespace dftfe
           dftfe::utils::makeDataTypeDeviceCompatible(rhoCellsWfcContributions),
           dftfe::utils::makeDataTypeDeviceCompatible(
             gradRhoCellsWfcContributions),
-          isEvaluateGradRho);
+          isEvaluateGradRho,
+          isNonCollin);
 #endif
       }
     else
@@ -406,6 +414,7 @@ namespace dftfe
     double *                                    rho,
     double *                                    gradRho,
     const bool                                  isEvaluateGradRho,
-    const bool                                  isNonCollin);
+    const bool                                  isNonCollin,
+    const bool                                  hasSOC);
 
 } // namespace dftfe

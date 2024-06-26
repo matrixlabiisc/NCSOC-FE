@@ -535,7 +535,8 @@ namespace dftfe
                               // spherical part
                               if (it->m > 0)
                                 {
-                                  if (d_dftParamsPtr->noncolin)
+                                  if ((d_dftParamsPtr->noncolin ||
+                                       d_dftParamsPtr->hasSOC))
                                     {
                                       d_eigenVectorsFlattenedHost
                                         [kPoint * d_numEigenValues *
@@ -564,7 +565,8 @@ namespace dftfe
                                 }
                               else if (it->m == 0)
                                 {
-                                  if (d_dftParamsPtr->noncolin)
+                                  if ((d_dftParamsPtr->noncolin ||
+                                       d_dftParamsPtr->hasSOC))
                                     {
                                       d_eigenVectorsFlattenedHost
                                         [kPoint * d_numEigenValues *
@@ -596,7 +598,8 @@ namespace dftfe
                                 }
                               else
                                 {
-                                  if (d_dftParamsPtr->noncolin)
+                                  if ((d_dftParamsPtr->noncolin ||
+                                       d_dftParamsPtr->hasSOC))
                                     {
                                       d_eigenVectorsFlattenedHost
                                         [kPoint * d_numEigenValues *
@@ -643,12 +646,16 @@ namespace dftfe
                       dataTypes::number *temp =
                         d_eigenVectorsFlattenedHost.data() +
                         kPoint * d_numEigenValues * numberDofs *
-                          (d_dftParamsPtr->noncolin ? 2 : 1);
+                          ((d_dftParamsPtr->noncolin ||
+                            d_dftParamsPtr->hasSOC) ?
+                             2 :
+                             1);
                       for (unsigned int iWave = waveFunctionsVector.size();
                            iWave < d_numEigenValues;
                            ++iWave)
                         {
-                          if (d_dftParamsPtr->noncolin)
+                          if ((d_dftParamsPtr->noncolin ||
+                               d_dftParamsPtr->hasSOC))
                             {
                               double z =
                                 (-0.5 + ((double)randomIntGenerator() -
@@ -705,14 +712,18 @@ namespace dftfe
              (1 + d_dftParamsPtr->spinPolarized) * d_kPointWeights.size();
              ++kPoint)
           {
-            dataTypes::number *temp1 = d_eigenVectorsFlattenedHost.data() +
-                                       kPoint * d_numEigenValues * numberDofs *
-                                         (d_dftParamsPtr->noncolin ? 2 : 1);
+            dataTypes::number *temp1 =
+              d_eigenVectorsFlattenedHost.data() +
+              kPoint * d_numEigenValues * numberDofs *
+                ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1);
 
             dataTypes::number *temp2 = d_eigenVectorsFlattenedHost.data();
 
             for (unsigned int idof = 0;
-                 idof < numberDofs * (d_dftParamsPtr->noncolin ? 2 : 1);
+                 idof <
+                 numberDofs *
+                   ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 :
+                                                                           1);
                  idof++)
               for (unsigned int iwave = 0; iwave < d_numEigenValues; iwave++)
                 temp1[idof * d_numEigenValues + iwave] =

@@ -92,13 +92,16 @@ namespace dftfe
       std::min(dftParams.chebyWfcBlockSize, bandGroupLowHighPlusOneIndices[1]);
 
     const double spinPolarizedFactor =
-      (dftParams.spinPolarized == 1 || dftParams.noncolin) ? 1.0 : 2.0;
+      (dftParams.spinPolarized == 1 || dftParams.noncolin || dftParams.hasSOC) ?
+        1.0 :
+        2.0;
     const unsigned int numSpinComponents =
       (dftParams.spinPolarized == 1) ? 2 : 1;
     const unsigned int numRhoComponents =
       dftParams.noncolin ? 4 : numSpinComponents;
 
-    const unsigned int numWfnSpinors = dftParams.noncolin ? 2 : 1;
+    const unsigned int numWfnSpinors =
+      (dftParams.noncolin || dftParams.hasSOC) ? 2 : 1;
 
     const NumberType zero                    = 0;
     const NumberType scalarCoeffAlphaRho     = 1.0;
@@ -311,7 +314,8 @@ namespace dftfe
                                                totalLocallyOwnedCells *
                                                numQuadPoints * 3,
                             isEvaluateGradRho,
-                            dftParams.noncolin);
+                            dftParams.noncolin,
+                            dftParams.hasSOC);
                         } // non-trivial cell block check
                     }     // cells block loop
                 }
@@ -443,7 +447,8 @@ namespace dftfe
                                                  totalLocallyOwnedCells *
                                                  numQuadPoints * 3,
                               isEvaluateGradRho,
-                              dftParams.noncolin);
+                              dftParams.noncolin,
+                              dftParams.hasSOC);
                           } // non-tivial cells block
                       }     // cells block loop
                   }
@@ -605,13 +610,14 @@ namespace dftfe
     double *                                    rho,
     double *                                    gradRho,
     const bool                                  isEvaluateGradRho,
-    const bool                                  isNonCollin)
+    const bool                                  isNonCollin,
+    const bool                                  hasSOC)
   {
     const unsigned int cellsBlockSize   = cellRange.second - cellRange.first;
     const unsigned int vectorsBlockSize = vecRange.second - vecRange.first;
     const unsigned int nQuadsPerCell    = basisOperationsPtr->nQuadsPerCell();
     const unsigned int nCells           = basisOperationsPtr->nCells();
-    if (isNonCollin)
+    if (isNonCollin || hasSOC)
       for (unsigned int iCell = cellRange.first; iCell < cellRange.second;
            ++iCell)
         for (unsigned int iQuad = 0; iQuad < nQuadsPerCell; ++iQuad)
@@ -630,17 +636,21 @@ namespace dftfe
               rho[0 * nCells * nQuadsPerCell + iCell * nQuadsPerCell + iQuad] +=
                 partialOccupVec[iWave] *
                 (std::abs(psiUp * psiUp) + std::abs(psiDown * psiDown));
-              rho[1 * nCells * nQuadsPerCell + iCell * nQuadsPerCell + iQuad] +=
-                partialOccupVec[iWave] *
-                (std::abs(psiUp * psiUp) - std::abs(psiDown * psiDown));
-              rho[2 * nCells * nQuadsPerCell + iCell * nQuadsPerCell + iQuad] +=
-                partialOccupVec[iWave] * 2.0 *
-                dftfe::utils::imagPart(dftfe::utils::complexConj(psiUp) *
-                                       psiDown);
-              rho[3 * nCells * nQuadsPerCell + iCell * nQuadsPerCell + iQuad] +=
-                partialOccupVec[iWave] * 2.0 *
-                dftfe::utils::realPart(dftfe::utils::complexConj(psiUp) *
-                                       psiDown);
+              if (isNonCollin)
+                {
+                  rho[1 * nCells * nQuadsPerCell + iCell * nQuadsPerCell +
+                      iQuad] +=
+                    partialOccupVec[iWave] *
+                    (std::abs(psiUp * psiUp) - std::abs(psiDown * psiDown));
+                  rho[2 * nCells * nQuadsPerCell + iCell * nQuadsPerCell +
+                      iQuad] += partialOccupVec[iWave] * 2.0 *
+                                dftfe::utils::imagPart(
+                                  dftfe::utils::complexConj(psiUp) * psiDown);
+                  rho[3 * nCells * nQuadsPerCell + iCell * nQuadsPerCell +
+                      iQuad] += partialOccupVec[iWave] * 2.0 *
+                                dftfe::utils::realPart(
+                                  dftfe::utils::complexConj(psiUp) * psiDown);
+                }
               if (isEvaluateGradRho)
                 {
                   for (unsigned int iDim = 0; iDim < 3; ++iDim)
@@ -664,24 +674,30 @@ namespace dftfe
                         dftfe::utils::realPart(
                           dftfe::utils::complexConj(psiUp) * gradPsiUp +
                           dftfe::utils::complexConj(psiDown) * gradPsiDown);
-                      gradRho[1 * nCells * nQuadsPerCell * 3 +
-                              iCell * nQuadsPerCell * 3 + 3 * iQuad + iDim] +=
-                        2.0 * partialOccupVec[iWave] *
-                        dftfe::utils::realPart(
-                          dftfe::utils::complexConj(psiUp) * gradPsiUp -
-                          dftfe::utils::complexConj(psiDown) * gradPsiDown);
-                      gradRho[2 * nCells * nQuadsPerCell * 3 +
-                              iCell * nQuadsPerCell * 3 + 3 * iQuad + iDim] +=
-                        2.0 * partialOccupVec[iWave] *
-                        dftfe::utils::imagPart(
-                          dftfe::utils::complexConj(gradPsiUp) * psiDown +
-                          dftfe::utils::complexConj(psiUp) * gradPsiDown);
-                      gradRho[3 * nCells * nQuadsPerCell * 3 +
-                              iCell * nQuadsPerCell * 3 + 3 * iQuad + iDim] +=
-                        2.0 * partialOccupVec[iWave] *
-                        dftfe::utils::realPart(
-                          dftfe::utils::complexConj(gradPsiUp) * psiDown +
-                          dftfe::utils::complexConj(psiUp) * gradPsiDown);
+                      if (isNonCollin)
+                        {
+                          gradRho[1 * nCells * nQuadsPerCell * 3 +
+                                  iCell * nQuadsPerCell * 3 + 3 * iQuad +
+                                  iDim] +=
+                            2.0 * partialOccupVec[iWave] *
+                            dftfe::utils::realPart(
+                              dftfe::utils::complexConj(psiUp) * gradPsiUp -
+                              dftfe::utils::complexConj(psiDown) * gradPsiDown);
+                          gradRho[2 * nCells * nQuadsPerCell * 3 +
+                                  iCell * nQuadsPerCell * 3 + 3 * iQuad +
+                                  iDim] +=
+                            2.0 * partialOccupVec[iWave] *
+                            dftfe::utils::imagPart(
+                              dftfe::utils::complexConj(gradPsiUp) * psiDown +
+                              dftfe::utils::complexConj(psiUp) * gradPsiDown);
+                          gradRho[3 * nCells * nQuadsPerCell * 3 +
+                                  iCell * nQuadsPerCell * 3 + 3 * iQuad +
+                                  iDim] +=
+                            2.0 * partialOccupVec[iWave] *
+                            dftfe::utils::realPart(
+                              dftfe::utils::complexConj(gradPsiUp) * psiDown +
+                              dftfe::utils::complexConj(psiUp) * gradPsiDown);
+                        }
                     }
                 }
             }

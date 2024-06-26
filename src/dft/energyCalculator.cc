@@ -634,7 +634,7 @@ namespace dftfe
                                 fermiEnergyUp,
                                 fermiEnergyDown,
                                 d_dftParams.TVal,
-                                d_dftParams.noncolin ?
+                                (d_dftParams.noncolin || d_dftParams.hasSOC) ?
                                   2 :
                                   d_dftParams.spinPolarized,
                                 scout,

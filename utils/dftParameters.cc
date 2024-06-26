@@ -658,7 +658,11 @@ namespace dftfe
           dealii::Patterns::Bool(),
           "[Standard] Perform a noncollinear spin calculation. Default option is false.");
 
-
+        prm.declare_entry(
+          "SPIN-ORBIT COUPLING",
+          "false",
+          dealii::Patterns::Bool(),
+          "[Standard] Perform a an SOC calculation, requires fully relativistic pseudopotentials. Default option is false.");
 
         prm.declare_entry(
           "START MAGNETIZATION",
@@ -1574,9 +1578,11 @@ namespace dftfe
       pseudoPotentialFile = prm.get("PSEUDOPOTENTIAL FILE NAMES LIST");
       xc_id               = prm.get_integer("EXCHANGE CORRELATION TYPE");
       noncolin            = prm.get_bool("NONCOLLINEAR SPIN");
-      spinPolarized       = noncolin ? 0 : prm.get_integer("SPIN POLARIZATION");
-      modelXCInputFile    = prm.get("MODEL XC INPUT FILE");
-      start_magnetization = prm.get_double("START MAGNETIZATION");
+      hasSOC              = prm.get_bool("SPIN-ORBIT COUPLING");
+      spinPolarized =
+        noncolin || hasSOC ? 0 : prm.get_integer("SPIN POLARIZATION");
+      modelXCInputFile      = prm.get("MODEL XC INPUT FILE");
+      start_magnetization   = prm.get_double("START MAGNETIZATION");
       pspCutoffImageCharges = prm.get_double("PSP CUTOFF IMAGE CHARGES");
       netCharge             = prm.get_double("NET CHARGE");
     }

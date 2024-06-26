@@ -165,8 +165,7 @@ namespace dftfe
         dealii::TimerOutput::every_call,
       dealii::TimerOutput::wall_times);
 
-    unsigned int       chebyshevOrder = d_dftParams.chebyshevOrder;
-    const unsigned int spinorFactor   = d_dftParams.noncolin ? 2 : 1;
+    unsigned int chebyshevOrder = d_dftParams.chebyshevOrder;
 
     //
     // set Chebyshev order

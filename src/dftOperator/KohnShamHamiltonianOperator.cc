@@ -1220,7 +1220,9 @@ namespace dftfe
     const unsigned int index)
   {
     return d_basisOperationsPtr->getMultiVector(
-      numVectors * (d_dftParamsPtr->noncolin ? 2 : 1), index);
+      numVectors *
+        ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1),
+      index);
   }
 
   template <dftfe::utils::MemorySpace memorySpace>
@@ -1230,7 +1232,9 @@ namespace dftfe
     const unsigned int index)
   {
     return d_basisOperationsPtr->getMultiVectorSinglePrec(
-      numVectors * (d_dftParamsPtr->noncolin ? 2 : 1), index);
+      numVectors *
+        ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1),
+      index);
   }
 
   template <dftfe::utils::MemorySpace memorySpace>
@@ -1472,8 +1476,8 @@ namespace dftfe
         d_ONCVnonLocalOperator->applyAllReduceOnCconjtransX(
           d_ONCVNonLocalProjectorTimesVectorBlock);
         d_ONCVnonLocalOperator->applyVOnCconjtransX(
-          d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
-                                     CouplingStructure::diagonal,
+          d_dftParamsPtr->hasSOC ? CouplingStructure::blockDiagonal :
+                                   CouplingStructure::diagonal,
           d_oncvClassPtr->getCouplingMatrix(),
           d_ONCVNonLocalProjectorTimesVectorBlock,
           true);
@@ -1729,8 +1733,8 @@ namespace dftfe
           {
             d_ONCVNonLocalProjectorTimesVectorBlock.updateGhostValuesEnd();
             d_ONCVnonLocalOperator->applyVOnCconjtransX(
-              d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
-                                         CouplingStructure::diagonal,
+              d_dftParamsPtr->hasSOC ? CouplingStructure::blockDiagonal :
+                                       CouplingStructure::diagonal,
               d_oncvClassPtr->getCouplingMatrix(),
               d_ONCVNonLocalProjectorTimesVectorBlock,
               true);
@@ -1891,8 +1895,8 @@ namespace dftfe
             d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec
               .updateGhostValuesEnd();
             d_ONCVnonLocalOperatorSinglePrec->applyVOnCconjtransX(
-              d_oncvClassPtr->hasSOC() ? CouplingStructure::blockDiagonal :
-                                         CouplingStructure::diagonal,
+              d_dftParamsPtr->hasSOC ? CouplingStructure::blockDiagonal :
+                                       CouplingStructure::diagonal,
               d_oncvClassPtr->getCouplingMatrixSinglePrec(),
               d_ONCVNonLocalProjectorTimesVectorBlockSinglePrec,
               true);

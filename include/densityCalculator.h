@@ -76,7 +76,8 @@ namespace dftfe
     double *                                    rho,
     double *                                    gradRho,
     const bool                                  isEvaluateGradRho,
-    const bool                                  isNonCollin);
+    const bool                                  isNonCollin,
+    const bool                                  hasSOC);
 
 #if defined(DFTFE_WITH_DEVICE)
   template <typename NumberType>
@@ -100,7 +101,8 @@ namespace dftfe
     double *                                    rho,
     double *                                    gradRho,
     const bool                                  isEvaluateGradRho,
-    const bool                                  isNonCollin);
+    const bool                                  isNonCollin,
+    const bool                                  hasSOC);
 #endif
 
 } // namespace dftfe

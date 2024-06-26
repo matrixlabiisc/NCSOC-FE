@@ -506,7 +506,9 @@ namespace dftfe
           }
       }
     else if (d_dftParamsPtr->numberEigenValues <=
-               numElectrons / (d_dftParamsPtr->noncolin ? 1.0 : 2.0) ||
+               numElectrons /
+                 ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 1.0 :
+                                                                         2.0) ||
              d_dftParamsPtr->numberEigenValues == 0)
       {
         if (d_dftParamsPtr->verbosity >= 1)
@@ -519,25 +521,32 @@ namespace dftfe
               << std::endl;
           }
         d_numEigenValues =
-          (numElectrons / (d_dftParamsPtr->noncolin ? 1.0 : 2.0)) +
-          std::max((d_dftParamsPtr->mixingMethod == "LOW_RANK_DIELECM_PRECOND" ?
-                      0.22 :
-                      0.2) *
-                     (numElectrons / (d_dftParamsPtr->noncolin ? 1.0 : 2.0)),
-                   20.0);
+          (numElectrons /
+           ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 1.0 : 2.0)) +
+          std::max(
+            (d_dftParamsPtr->mixingMethod == "LOW_RANK_DIELECM_PRECOND" ? 0.22 :
+                                                                          0.2) *
+              (numElectrons /
+               ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 1.0 :
+                                                                       2.0)),
+            20.0);
 
         // start with 17-20% buffer to leave room for additional modifications
         // due to block size restrictions
 #ifdef DFTFE_WITH_DEVICE
         if (d_dftParamsPtr->useDevice && d_dftParamsPtr->autoDeviceBlockSizes)
           d_numEigenValues =
-            (numElectrons / (d_dftParamsPtr->noncolin ? 1.0 : 2.0)) +
-            std::max((d_dftParamsPtr->mixingMethod ==
-                          "LOW_RANK_DIELECM_PRECOND" ?
-                        0.2 :
-                        0.17) *
-                       (numElectrons / (d_dftParamsPtr->noncolin ? 1.0 : 2.0)),
-                     20.0);
+            (numElectrons /
+             ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 1.0 :
+                                                                     2.0)) +
+            std::max(
+              (d_dftParamsPtr->mixingMethod == "LOW_RANK_DIELECM_PRECOND" ?
+                 0.2 :
+                 0.17) *
+                (numElectrons /
+                 ((d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 1.0 :
+                                                                         2.0)),
+              20.0);
 #endif
 
         if (d_dftParamsPtr->verbosity >= 1)

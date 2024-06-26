@@ -298,7 +298,8 @@ namespace dftfe
   {
     computing_timer.enter_subsection("Chebyshev solve");
 
-    const unsigned int spinorFactor = d_dftParamsPtr->noncolin ? 2 : 1;
+    const unsigned int spinorFactor =
+      (d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1;
     if (d_dftParamsPtr->verbosity >= 2)
       {
         pcout << "kPoint: " << kPointIndex << std::endl;
@@ -504,7 +505,8 @@ namespace dftfe
         if (d_dftParamsPtr->spinPolarized == 1)
           pcout << "spin: " << spinType + 1 << std::endl;
       }
-    const unsigned int spinorFactor = d_dftParamsPtr->noncolin ? 2 : 1;
+    const unsigned int spinorFactor =
+      (d_dftParamsPtr->noncolin || d_dftParamsPtr->hasSOC) ? 2 : 1;
 
     std::vector<double> eigenValuesTemp(isSpectrumSplit ? d_numEigenValuesRR :
                                                           d_numEigenValues,

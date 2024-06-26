@@ -433,7 +433,6 @@ namespace dftfe
       const unsigned int this_mpi_process =
         dealii::Utilities::MPI::this_mpi_process(
           operatorMatrix.getMPICommunicatorDomain());
-      const unsigned int spinorFactor = dftParams.noncolin ? 2 : 1;
 
       const unsigned int lanczosIterations =
         dftParams.reproducible_output ? 200 : 50;
@@ -449,7 +448,7 @@ namespace dftfe
       Y.setValue(T(0.0));
       Z.setValue(T(0.0));
       tempVec.setValue(T(0.0));
-      const unsigned int local_size = X.locallyOwnedSize() * spinorFactor;
+      const unsigned int local_size = X.locallyOwnedSize() * X.numVectors();
 #if defined(DFTFE_WITH_DEVICE)
       dftfe::utils::MemoryStorage<T, dftfe::utils::MemorySpace::HOST> XHost(
         local_size, T(0.0));
