@@ -146,7 +146,8 @@ namespace dftfe
       double *           gradwfcContributions,
       double *           rhoCellsWfcContributions,
       double *           gradRhoCellsWfcContributions,
-      const bool         isEvaluateGradRho)
+      const bool         isEvaluateGradRho,
+      const bool         isNonCollin)
     {}
 
     __global__ void
