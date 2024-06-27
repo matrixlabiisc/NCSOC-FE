@@ -825,7 +825,6 @@ namespace dftfe
         }
     }
 
-
     void
     rayleighRitzGEPELPA(
       operatorDFTClass<dftfe::utils::MemorySpace::DEVICE> &operatorMatrix,
@@ -869,9 +868,10 @@ namespace dftfe
           dftfe::utils::deviceSynchronize();
           if (dftParams.useMixedPrecCGS_O && useMixedPrecOverall)
             computing_timer.enter_subsection(
-              "SConj=X^{T}XConj Mixed Prec, RR GEP step");
+              "SConj=X^{T}*MConj*XConj Mixed Prec, RR GEP step");
           else
-            computing_timer.enter_subsection("SConj=X^{T}XConj, RR GEP step");
+            computing_timer.enter_subsection(
+              "SConj=X^{T}*MConj*XConj, RR GEP step");
         }
 
       //
@@ -890,58 +890,66 @@ namespace dftfe
       if (dftParams.useMixedPrecCGS_O && useMixedPrecOverall)
         {
           if (dftParams.overlapComputeCommunOrthoRR)
-            linearAlgebraOperationsDevice::
-              fillParallelOverlapMatMixedPrecScalapackAsyncComputeCommun(
-                X,
-                M,
-                N,
-                handle,
-                mpiCommDomain,
-                devicecclMpiCommDomain,
-                interBandGroupComm,
-                processGrid,
-                overlapMatPar,
-                dftParams);
+            XtOXMixedPrecCommunOverlapComputeCommun(operatorMatrix,
+                                                    X,
+                                                    Xb,
+                                                    HXb,
+                                                    M,
+                                                    N,
+                                                    dftParams.numCoreWfcXtHX,
+                                                    handle,
+                                                    processGrid,
+                                                    overlapMatPar,
+                                                    devicecclMpiCommDomain,
+                                                    mpiCommDomain,
+                                                    interBandGroupComm,
+                                                    dftParams);
           else
-            linearAlgebraOperationsDevice::
-              fillParallelOverlapMatMixedPrecScalapack(X,
-                                                       M,
-                                                       N,
-                                                       handle,
-                                                       mpiCommDomain,
-                                                       devicecclMpiCommDomain,
-                                                       interBandGroupComm,
-                                                       processGrid,
-                                                       overlapMatPar,
-                                                       dftParams);
+            XtOXMixedPrecOverlapComputeCommun(operatorMatrix,
+                                              X,
+                                              Xb,
+                                              HXb,
+                                              M,
+                                              N,
+                                              dftParams.numCoreWfcXtHX,
+                                              handle,
+                                              processGrid,
+                                              overlapMatPar,
+                                              devicecclMpiCommDomain,
+                                              mpiCommDomain,
+                                              interBandGroupComm,
+                                              dftParams);
         }
       else
         {
           if (dftParams.overlapComputeCommunOrthoRR)
-            linearAlgebraOperationsDevice::
-              fillParallelOverlapMatScalapackAsyncComputeCommun(
-                X,
-                M,
-                N,
-                handle,
-                mpiCommDomain,
-                devicecclMpiCommDomain,
-                interBandGroupComm,
-                processGrid,
-                overlapMatPar,
-                dftParams);
+            XtOXOverlapComputeCommun(operatorMatrix,
+                                     X,
+                                     Xb,
+                                     HXb,
+                                     M,
+                                     N,
+                                     handle,
+                                     processGrid,
+                                     overlapMatPar,
+                                     devicecclMpiCommDomain,
+                                     mpiCommDomain,
+                                     interBandGroupComm,
+                                     dftParams);
           else
-            linearAlgebraOperationsDevice::fillParallelOverlapMatScalapack(
-              X,
-              M,
-              N,
-              handle,
-              mpiCommDomain,
-              devicecclMpiCommDomain,
-              interBandGroupComm,
-              processGrid,
-              overlapMatPar,
-              dftParams);
+            XtOX(operatorMatrix,
+                 X,
+                 Xb,
+                 HXb,
+                 M,
+                 N,
+                 handle,
+                 processGrid,
+                 overlapMatPar,
+                 devicecclMpiCommDomain,
+                 mpiCommDomain,
+                 interBandGroupComm,
+                 dftParams);
         }
 
       // Construct the full HConjProj matrix
@@ -978,9 +986,10 @@ namespace dftfe
           dftfe::utils::deviceSynchronize();
           if (dftParams.useMixedPrecCGS_O && useMixedPrecOverall)
             computing_timer.leave_subsection(
-              "SConj=X^{T}XConj Mixed Prec, RR GEP step");
+              "SConj=X^{T}*MConj*XConj Mixed Prec, RR GEP step");
           else
-            computing_timer.leave_subsection("SConj=X^{T}XConj, RR GEP step");
+            computing_timer.leave_subsection(
+              "SConj=X^{T}*MConj*XConj, RR GEP step");
         }
 
       if (dftParams.deviceFineGrainedTimings)

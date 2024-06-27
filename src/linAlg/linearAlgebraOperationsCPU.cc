@@ -436,9 +436,9 @@ namespace dftfe
 
       if (dftParams.useMixedPrecCGS_O && useMixedPrec)
         computing_timer.enter_subsection(
-          "SConj=X^{T}XConj Mixed Prec, RR GEP step");
+          "SConj=X^{T}OXConj Mixed Prec, RR GEP step");
       else
-        computing_timer.enter_subsection("SConj=X^{T}XConj, RR GEP step");
+        computing_timer.enter_subsection("SConj=X^{T}OXConj, RR GEP step");
       //
       // compute overlap matrix
       //
@@ -452,42 +452,50 @@ namespace dftfe
                     overlapMatPar.local_m() * overlapMatPar.local_n(),
                   T(0.0));
 
+      dftfe::ScaLAPACKMatrix<T> projHamPar(numberWaveFunctions,
+                                           processGrid,
+                                           rowsBlockSize);
+      if (processGrid->is_process_active())
+        std::fill(&projHamPar.local_el(0, 0),
+                  &projHamPar.local_el(0, 0) +
+                    projHamPar.local_m() * projHamPar.local_n(),
+                  T(0.0));
+
       // SConj=X^{T}*XConj.
       if (!(dftParams.useMixedPrecCGS_O && useMixedPrec))
         {
-          internal::fillParallelOverlapMatrix(
-            X,
-            numberWaveFunctions * localVectorSize,
-            numberWaveFunctions,
-            processGrid,
-            interBandGroupComm,
-            operatorMatrix.getMPICommunicatorDomain(),
-            overlapMatPar,
-            dftParams);
+          XtOX(operatorMatrix,
+               X,
+               numberWaveFunctions,
+               localVectorSize,
+               processGrid,
+               operatorMatrix.getMPICommunicatorDomain(),
+               interBandGroupComm,
+               dftParams,
+               overlapMatPar);
         }
       else
         {
-          if (std::is_same<T, std::complex<double>>::value)
-            internal::fillParallelOverlapMatrixMixedPrec<T,
-                                                         std::complex<float>>(
-              X,
-              numberWaveFunctions * localVectorSize,
-              numberWaveFunctions,
-              processGrid,
-              interBandGroupComm,
-              operatorMatrix.getMPICommunicatorDomain(),
-              overlapMatPar,
-              dftParams);
-          else
-            internal::fillParallelOverlapMatrixMixedPrec<T, float>(
-              X,
-              numberWaveFunctions * localVectorSize,
-              numberWaveFunctions,
-              processGrid,
-              interBandGroupComm,
-              operatorMatrix.getMPICommunicatorDomain(),
-              overlapMatPar,
-              dftParams);
+          // XtOXMixedPrec(operatorMatrix,
+          //               X,
+          //               numberWaveFunctions,
+          //               localVectorSize,
+          //               processGrid,
+          //               operatorMatrix.getMPICommunicatorDomain(),
+          //               interBandGroupComm,
+          //               dftParams,
+          //               overlapMatPar);
+          XtHXXtOXMixedPrec(operatorMatrix,
+                            X,
+                            numberWaveFunctions,
+                            dftParams.numCoreWfcXtHX,
+                            localVectorSize,
+                            processGrid,
+                            operatorMatrix.getMPICommunicatorDomain(),
+                            interBandGroupComm,
+                            dftParams,
+                            projHamPar,
+                            overlapMatPar);
         }
       // Construct the full overlap matrix
       dftfe::ScaLAPACKMatrix<T> overlapMatParConjTrans(numberWaveFunctions,
@@ -527,25 +535,32 @@ namespace dftfe
       //
       // compute projected Hamiltonian conjugate HConjProj= X^{T}*HConj*XConj
       //
-      dftfe::ScaLAPACKMatrix<T> projHamPar(numberWaveFunctions,
-                                           processGrid,
-                                           rowsBlockSize);
-      if (processGrid->is_process_active())
-        std::fill(&projHamPar.local_el(0, 0),
-                  &projHamPar.local_el(0, 0) +
-                    projHamPar.local_m() * projHamPar.local_n(),
-                  T(0.0));
 
-
-      XtHX(operatorMatrix,
-           X,
-           numberWaveFunctions,
-           localVectorSize,
-           processGrid,
-           operatorMatrix.getMPICommunicatorDomain(),
-           interBandGroupComm,
-           dftParams,
-           projHamPar);
+      if (!(dftParams.useMixedPrecXTHXSpectrumSplit && useMixedPrec))
+        {
+          XtHX(operatorMatrix,
+               X,
+               numberWaveFunctions,
+               localVectorSize,
+               processGrid,
+               operatorMatrix.getMPICommunicatorDomain(),
+               interBandGroupComm,
+               dftParams,
+               projHamPar);
+        }
+      else
+        {
+          // XtHXMixedPrec(operatorMatrix,
+          //               X,
+          //               numberWaveFunctions,
+          //               dftParams.numCoreWfcXtHX,
+          //               localVectorSize,
+          //               processGrid,
+          //               operatorMatrix.getMPICommunicatorDomain(),
+          //               interBandGroupComm,
+          //               dftParams,
+          //               projHamPar);
+        }
       // Construct the full HConjProj matrix
       dftfe::ScaLAPACKMatrix<T> projHamParConjTrans(numberWaveFunctions,
                                                     processGrid,
