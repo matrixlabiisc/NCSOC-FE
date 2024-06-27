@@ -318,8 +318,13 @@ namespace dftfe
         else
           subdivisions[i] = std::floor(numberIntervalsEachDirection[i]);
       }
-
-
+    for (unsigned int iDim = 0; iDim < 3; ++iDim)
+      pcout << "DEBUG base mesh divisions : " << subdivisions[iDim] << " ";
+    pcout << std::endl
+          << "DEBUG base mesh lengths : "
+          << domainBoundingVectorMag1 / subdivisions[0] << " "
+          << domainBoundingVectorMag2 / subdivisions[1] << " "
+          << domainBoundingVectorMag3 / subdivisions[2] << std::endl;
     dealii::GridGenerator::subdivided_parallelepiped<3>(parallelTriangulation,
                                                         subdivisions,
                                                         basisVectors);
