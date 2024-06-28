@@ -437,6 +437,7 @@ namespace dftfe
         double,
         dftfe::utils::MemorySpace::HOST>> basisOperationsPtr,
       const unsigned int                  quadratureIndex);
+#if defined(DFTFE_WITH_DEVICE)
     /**
      * @brief Copies the data from distributed Vector to Padded Memory storage object.
      * @param[in] sphericalFunctionKetTimesVectorParFlattened Distributed Vector
@@ -454,6 +455,7 @@ namespace dftfe
       const dftfe::utils::MemoryStorage<ValueType, memorySpace> &paddedVector,
       dftfe::linearAlgebra::MultiVector<ValueType, memorySpace>
         &sphericalFunctionKetTimesVectorParFlattened);
+#endif
 
     std::map<
       unsigned int,

@@ -2485,6 +2485,8 @@ namespace dftfe
           }
       }
   }
+
+#if defined(DFTFE_WITH_DEVICE)
   template <typename ValueType, dftfe::utils::MemorySpace memorySpace>
   void
   AtomicCenteredNonLocalOperator<ValueType, memorySpace>::
@@ -2526,6 +2528,7 @@ namespace dftfe
         sphericalFunctionKetTimesVectorParFlattened.begin(),
         d_sphericalFnIdsPaddedParallelNumberingMapDevice.begin());
   }
+#endif
 
   template class AtomicCenteredNonLocalOperator<
     dataTypes::number,
