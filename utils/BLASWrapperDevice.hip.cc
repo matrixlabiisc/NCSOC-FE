@@ -1014,36 +1014,34 @@ namespace dftfe
         {
           // Assert Statement
         }
-      hipblasComputeType_t computeType = HIPBLAS_COMPUTE_32F;
-      if (d_opType == tensorOpDataType::tf32)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
-      else if (d_opType == tensorOpDataType::bf16)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      hipblasDatatype_t computeType = HIPBLAS_R_32F;
+      if (d_opType == tensorOpDataType::bf16)
+        computeType = HIPBLAS_R_16B;
 
       dftfe::utils::deviceBlasStatus_t status =
-        hipblasGemmStridedBatchedEx_v2(d_deviceBlasHandle,
-                                       transa,
-                                       transb,
-                                       int(m),
-                                       int(n),
-                                       int(k),
-                                       (const void *)alpha,
-                                       (const void *)A,
-                                       HIP_R_32F,
-                                       int(lda),
-                                       strideA,
-                                       (const void *)B,
-                                       HIP_R_32F,
-                                       int(ldb),
-                                       strideB,
-                                       (const void *)beta,
-                                       (void *)C,
-                                       HIP_R_32F,
-                                       int(ldc),
-                                       strideC,
-                                       int(batchCount),
-                                       computeType,
-                                       HIPBLAS_GEMM_DEFAULT);
+        hipblasGemmStridedBatchedEx(d_deviceBlasHandle,
+                                    transa,
+                                    transb,
+                                    int(m),
+                                    int(n),
+                                    int(k),
+                                    (const void *)alpha,
+                                    (const void *)A,
+                                    HIPBLAS_R_32F,
+                                    int(lda),
+                                    strideA,
+                                    (const void *)B,
+                                    HIPBLAS_R_32F,
+                                    int(ldb),
+                                    strideB,
+                                    (const void *)beta,
+                                    (void *)C,
+                                    HIPBLAS_R_32F,
+                                    int(ldc),
+                                    strideC,
+                                    int(batchCount),
+                                    computeType,
+                                    HIPBLAS_GEMM_DEFAULT);
       DEVICEBLAS_API_CHECK(status);
     }
 
@@ -1090,35 +1088,33 @@ namespace dftfe
           // Assert Statement
         }
 
-      hipblasComputeType_t computeType = HIPBLAS_COMPUTE_32F;
-      if (d_opType == tensorOpDataType::tf32)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
-      else if (d_opType == tensorOpDataType::bf16)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      hipblasDatatype_t computeType = HIPBLAS_C_32F;
+      if (d_opType == tensorOpDataType::bf16)
+        computeType = HIPBLAS_C_16B;
       dftfe::utils::deviceBlasStatus_t status =
-        hipblasGemmStridedBatchedEx_v2(d_deviceBlasHandle,
-                                       transa,
-                                       transb,
-                                       int(m),
-                                       int(n),
-                                       int(k),
-                                       (const void *)alpha,
-                                       (const void *)A,
-                                       HIP_C_32F,
-                                       int(lda),
-                                       strideA,
-                                       (const void *)B,
-                                       HIP_C_32F,
-                                       int(ldb),
-                                       strideB,
-                                       (const void *)beta,
-                                       (void *)C,
-                                       HIP_C_32F,
-                                       int(ldc),
-                                       strideC,
-                                       int(batchCount),
-                                       computeType,
-                                       HIPBLAS_GEMM_DEFAULT);
+        hipblasGemmStridedBatchedEx(d_deviceBlasHandle,
+                                    transa,
+                                    transb,
+                                    int(m),
+                                    int(n),
+                                    int(k),
+                                    (const void *)alpha,
+                                    (const void *)A,
+                                    HIPBLAS_C_32F,
+                                    int(lda),
+                                    strideA,
+                                    (const void *)B,
+                                    HIPBLAS_C_32F,
+                                    int(ldb),
+                                    strideB,
+                                    (const void *)beta,
+                                    (void *)C,
+                                    HIPBLAS_C_32F,
+                                    int(ldc),
+                                    strideC,
+                                    int(batchCount),
+                                    computeType,
+                                    HIPBLAS_GEMM_DEFAULT);
       DEVICEBLAS_API_CHECK(status);
     }
     void
@@ -1276,32 +1272,30 @@ namespace dftfe
           // Assert Statement
         }
 
-      hipblasComputeType_t computeType = HIPBLAS_COMPUTE_32F;
-      if (d_opType == tensorOpDataType::tf32)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
-      else if (d_opType == tensorOpDataType::bf16)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      hipblasDatatype_t computeType = HIPBLAS_R_32F;
+      if (d_opType == tensorOpDataType::bf16)
+        computeType = HIPBLAS_R_16B;
       dftfe::utils::deviceBlasStatus_t status =
-        hipblasGemmBatchedEx_v2(d_deviceBlasHandle,
-                                transa,
-                                transb,
-                                int(m),
-                                int(n),
-                                int(k),
-                                (const void *)alpha,
-                                (const void **)A,
-                                HIP_R_32F,
-                                int(lda),
-                                (const void **)B,
-                                HIP_R_32F,
-                                int(ldb),
-                                (const void *)beta,
-                                (void **)C,
-                                HIP_R_32F,
-                                int(ldc),
-                                int(batchCount),
-                                computeType,
-                                HIPBLAS_GEMM_DEFAULT);
+        hipblasGemmBatchedEx(d_deviceBlasHandle,
+                             transa,
+                             transb,
+                             int(m),
+                             int(n),
+                             int(k),
+                             (const void *)alpha,
+                             (const void **)A,
+                             HIPBLAS_R_32F,
+                             int(lda),
+                             (const void **)B,
+                             HIPBLAS_R_32F,
+                             int(ldb),
+                             (const void *)beta,
+                             (void **)C,
+                             HIPBLAS_R_32F,
+                             int(ldc),
+                             int(batchCount),
+                             computeType,
+                             HIPBLAS_GEMM_DEFAULT);
 
       DEVICEBLAS_API_CHECK(status);
     }
@@ -1345,32 +1339,30 @@ namespace dftfe
           // Assert Statement
         }
 
-      hipblasComputeType_t computeType = HIPBLAS_COMPUTE_32F;
-      if (d_opType == tensorOpDataType::tf32)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_TF32;
-      else if (d_opType == tensorOpDataType::bf16)
-        computeType = HIPBLAS_COMPUTE_32F_FAST_16BF;
+      hipblasDatatype_t computeType = HIPBLAS_C_32F;
+      if (d_opType == tensorOpDataType::bf16)
+        computeType = HIPBLAS_C_16B;
       dftfe::utils::deviceBlasStatus_t status =
-        hipblasGemmBatchedEx_v2(d_deviceBlasHandle,
-                                transa,
-                                transb,
-                                int(m),
-                                int(n),
-                                int(k),
-                                (const void *)alpha,
-                                (const void **)A,
-                                HIP_C_32F,
-                                int(lda),
-                                (const void **)B,
-                                HIP_C_32F,
-                                int(ldb),
-                                (const void *)beta,
-                                (void **)C,
-                                HIP_C_32F,
-                                int(ldc),
-                                int(batchCount),
-                                computeType,
-                                HIPBLAS_GEMM_DEFAULT);
+        hipblasGemmBatchedEx(d_deviceBlasHandle,
+                             transa,
+                             transb,
+                             int(m),
+                             int(n),
+                             int(k),
+                             (const void *)alpha,
+                             (const void **)A,
+                             HIPBLAS_C_32F,
+                             int(lda),
+                             (const void **)B,
+                             HIPBLAS_C_32F,
+                             int(ldb),
+                             (const void *)beta,
+                             (void **)C,
+                             HIPBLAS_C_32F,
+                             int(ldc),
+                             int(batchCount),
+                             computeType,
+                             HIPBLAS_GEMM_DEFAULT);
 
       DEVICEBLAS_API_CHECK(status);
     }
