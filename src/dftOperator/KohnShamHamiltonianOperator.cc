@@ -1812,6 +1812,15 @@ namespace dftfe
     const unsigned int numDoFsPerCell = d_basisOperationsPtr->nDofsPerCell();
     const unsigned int spinorFactor   = d_dftParamsPtr->noncolin ? 2 : 1;
     const unsigned int numberWavefunctions = src.numVectors() / spinorFactor;
+    if constexpr (memorySpace == dftfe::utils::MemorySpace::DEVICE)
+      {
+        if (d_dftParamsPtr->tensorOpType == "TF32")
+          d_BLASWrapperPtr->setTensorOpDataType(
+            dftfe::linearAlgebra::tensorOpDataType::tf32);
+        if (d_dftParamsPtr->tensorOpType == "BF16")
+          d_BLASWrapperPtr->setTensorOpDataType(
+            dftfe::linearAlgebra::tensorOpDataType::bf16);
+      }
     if (d_numVectorsInternal != numberWavefunctions * spinorFactor)
       reinitNumberWavefunctions(numberWavefunctions * spinorFactor);
 
@@ -1956,6 +1965,9 @@ namespace dftfe
         dst.accumulateAddLocallyOwned();
         dst.zeroOutGhosts();
       }
+    if constexpr (memorySpace == dftfe::utils::MemorySpace::DEVICE)
+      d_BLASWrapperPtr->setTensorOpDataType(
+        dftfe::linearAlgebra::tensorOpDataType::fp32);
   }
 
 
