@@ -527,9 +527,9 @@ namespace dftfe
 
       if (dftParams.useMixedPrecCGS_O && useMixedPrec)
         computing_timer.leave_subsection(
-          "SConj=X^{T}XConj Mixed Prec, RR GEP step");
+          "SConj=X^{T}OXConj Mixed Prec, RR GEP step");
       else
-        computing_timer.leave_subsection("SConj=X^{T}XConj, RR GEP step");
+        computing_timer.leave_subsection("SConj=X^{T}OXConj, RR GEP step");
 
       computing_timer.enter_subsection("Compute ProjHam, RR step");
       //
