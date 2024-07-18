@@ -95,7 +95,7 @@ namespace dftfe
     //
     dealii::QGauss<3> quadrature(
       C_num1DQuad<C_rhoNodalPolyOrder<FEOrder, FEOrderElectro>()>());
-    dealii::FEValues<3>  fe_values(dftPtr->FEEigen,
+    dealii::FEValues<3>  fe_values(*(dftPtr->FEEigen),
                                   quadrature,
                                   dealii::update_values |
                                     dealii::update_gradients |

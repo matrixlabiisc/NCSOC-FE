@@ -52,7 +52,7 @@ namespace dftfe
     bool   diagonalMassMatrix;
     double absLinearSolverTolerance, selfConsistentSolverTolerance, TVal,
       selfConsistentSolverEnergyTolerance, start_magnetization,
-      absLinearSolverToleranceHelmholtz;
+      absLinearSolverToleranceHelmholtz, pCoarsenedSolveTolerance;
 
     bool isPseudopotential, periodicX, periodicY, periodicZ, useSymm,
       timeReversal, pseudoTestsFlag, constraintMagnetization, writeDosFile,
@@ -141,6 +141,7 @@ namespace dftfe
     bool         allowFullCPUMemSubspaceRot;
     bool         useSinglePrecCommunCheby;
     bool         useSinglePrecCheby;
+    bool         usepCoarsenedSolve;
     bool         overlapComputeCommunCheby;
     bool         overlapComputeCommunOrthoRR;
     bool         autoDeviceBlockSizes;

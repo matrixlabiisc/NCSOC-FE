@@ -86,6 +86,13 @@ namespace dftfe
     return 5; //
   }
 
+  template <unsigned int FEOrder>
+  constexpr unsigned int
+  C_pCoarsenedFEOrder()
+  {
+    return FEOrder - 1;
+  }
+
 #ifdef DFTFE_WITH_HIGHERQUAD_PSP
   /// rho nodal polynomial order
   template <unsigned int FEOrder, unsigned int FEOrderElectro>

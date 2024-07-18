@@ -295,6 +295,23 @@ BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::
                                    const dftfe::size_type      startingId,
                                    const std::complex<double> *copyFromVec,
                                    std::complex<double> *      copyToVec);
+template void
+BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::
+  stridedCopyFromBlockConstantStride(const dftfe::size_type blockSizeTo,
+                                     const dftfe::size_type blockSizeFrom,
+                                     const dftfe::size_type numBlocks,
+                                     const dftfe::size_type startingId,
+                                     const double *         copyFromVec,
+                                     double *               copyToVec);
+
+template void
+BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::
+  stridedCopyFromBlockConstantStride(const dftfe::size_type      blockSizeTo,
+                                     const dftfe::size_type      blockSizeFrom,
+                                     const dftfe::size_type      numBlocks,
+                                     const dftfe::size_type      startingId,
+                                     const std::complex<double> *copyFromVec,
+                                     std::complex<double> *      copyToVec);
 // axpyStridedBlockAtomicAdd
 template void
 BLASWrapper<dftfe::utils::MemorySpace::DEVICE>::axpyStridedBlockAtomicAdd(

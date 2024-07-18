@@ -427,7 +427,6 @@ namespace dftfe
 
         if (boundingBoxTria.get_neighbor_type(boundingBoxAroundAtom) !=
             dealii::NeighborType::not_neighbors)
-          ;
         waveFunctionsVectorTruncated.push_back(*it);
       }
 

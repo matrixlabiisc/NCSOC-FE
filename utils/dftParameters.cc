@@ -744,6 +744,18 @@ namespace dftfe
           "[Standard] SCF iterations stopping tolerance in terms of $L_2$ norm of the electron-density difference between two successive iterations. The default tolerance of is set to a tight value of 1e-5 for accurate ionic forces and cell stresses keeping structural optimization and molecular dynamics in mind. A tolerance of 1e-4 would be accurate enough for calculations without structural optimization and dynamics. CAUTION: A tolerance close to 1e-7 or lower can deteriorate the SCF convergence due to the round-off error accumulation.");
 
         prm.declare_entry(
+          "COARSE MESH TOLERANCE",
+          "1e-03",
+          dealii::Patterns::Double(1e-12, 1.0),
+          "[Standard] SCF iterations stopping tolerance in terms of $L_2$ norm of the electron-density difference between two successive iterations on the coarse mesh. The default tolerance of is set to a value of 1e-3.");
+
+        prm.declare_entry(
+          "USE COARSE MESH",
+          "false",
+          dealii::Patterns::Bool(),
+          "[Standard] Do the initial SCF iterations on mesh lower FEOrder, default value is false.");
+
+        prm.declare_entry(
           "ENERGY TOLERANCE",
           "1e-07",
           dealii::Patterns::Double(1e-12, 1.0),
@@ -1600,6 +1612,8 @@ namespace dftfe
       TVal                          = prm.get_double("TEMPERATURE");
       numSCFIterations              = prm.get_integer("MAXIMUM ITERATIONS");
       selfConsistentSolverTolerance = prm.get_double("TOLERANCE");
+      usepCoarsenedSolve            = prm.get_bool("USE COARSE MESH");
+      pCoarsenedSolveTolerance      = prm.get_double("COARSE MESH TOLERANCE");
       selfConsistentSolverEnergyTolerance = prm.get_double("ENERGY TOLERANCE");
       mixingHistory                       = prm.get_integer("MIXING HISTORY");
       mixingParameter                     = prm.get_double("MIXING PARAMETER");

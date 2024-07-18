@@ -498,8 +498,8 @@ namespace dftfe
                 dofHandlerEigen.clear();
                 dofHandler.reinit(d_mesh.getParallelMeshMoved());
                 dofHandlerEigen.reinit(d_mesh.getParallelMeshMoved());
-                dofHandler.distribute_dofs(FE);
-                dofHandlerEigen.distribute_dofs(FEEigen);
+                dofHandler.distribute_dofs(*FE);
+                dofHandlerEigen.distribute_dofs(*FEEigen);
 
                 d_dofHandlerPRefined.clear();
                 d_dofHandlerPRefined.reinit(d_mesh.getParallelMeshMoved());

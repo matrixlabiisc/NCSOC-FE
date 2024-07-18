@@ -1086,7 +1086,7 @@ namespace dftfe
     const dealii::Quadrature<3> &quadrature =
       matrix_free_data.get_quadrature(d_densityQuadratureId);
     dealii::FEValues<3> fe_values(
-      FEEigen, quadrature, dealii::update_values | dealii::update_gradients);
+      *FEEigen, quadrature, dealii::update_values | dealii::update_gradients);
     const unsigned int num_quad_points = quadrature.size();
     const unsigned int numCells        = matrix_free_data.n_physical_cells();
 

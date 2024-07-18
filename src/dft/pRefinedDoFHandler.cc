@@ -453,7 +453,7 @@ namespace dftfe
             d_basisOperationsPtrElectroDevice->clear();
             d_basisOperationsPtrElectroDevice->init(
               *d_basisOperationsPtrElectroHost);
-            if (FEOrder != FEOrderElectro)
+            if (FEOrder != FEOrderElectro || d_dftParamsPtr->usepCoarsenedSolve)
               d_basisOperationsPtrElectroDevice->computeCellStiffnessMatrix(
                 d_phiTotAXQuadratureIdElectro, 50, true, false);
           }
@@ -474,7 +474,7 @@ namespace dftfe
               d_baseDofHandlerIndexElectro,
               quadratureIndices,
               updateFlags);
-            if (FEOrder != FEOrderElectro)
+            if (FEOrder != FEOrderElectro || d_dftParamsPtr->usepCoarsenedSolve)
               d_basisOperationsPtrElectroDevice->computeCellStiffnessMatrix(
                 d_phiTotAXQuadratureIdElectro, 50, true, false);
           }

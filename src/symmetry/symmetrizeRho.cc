@@ -339,7 +339,7 @@ namespace dftfe
             //
             //
             dealii::Quadrature<3> quadRule(quadPointList);
-            dealii::FEValues<3>   fe_values(dftPtr->FEEigen,
+            dealii::FEValues<3>   fe_values(*(dftPtr->FEEigen),
                                           quadRule,
                                           dealii::update_values |
                                             dealii::update_gradients |

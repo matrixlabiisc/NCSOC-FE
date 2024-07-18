@@ -35,24 +35,12 @@ namespace dftfe
   template <unsigned int              FEOrder,
             unsigned int              FEOrderElectro,
             dftfe::utils::MemorySpace memorySpace>
-  void dftClass<FEOrder, FEOrderElectro, memorySpace>::initUnmovedTriangulation(
-    dealii::parallel::distributed::Triangulation<3> &triangulation)
+  void dftClass<FEOrder, FEOrderElectro, memorySpace>::createDofHandlers(
+    dealii::FESystem<3> &                            fe,
+    dealii::FESystem<3> &                            feeigen,
+    dealii::parallel::distributed::Triangulation<3> &triaObject)
   {
     computing_timer.enter_subsection("unmoved setup");
-
-    // initialize affine transformation object (must be done on unmoved
-    // triangulation)
-    if (d_dftParamsPtr->isCellStress)
-      d_affineTransformMesh.init(triangulation,
-                                 d_mesh.getSerialMeshUnmoved(),
-                                 d_domainBoundingVectors);
-
-    // initialize meshMovementGaussianClass object (must be done on unmoved
-    // triangulation) when not using floating charges
-    if (!d_dftParamsPtr->floatingNuclearCharges)
-      d_gaussianMovePar.init(triangulation,
-                             d_mesh.getSerialMeshUnmoved(),
-                             d_domainBoundingVectors);
 
     if (d_dftParamsPtr->verbosity >= 4)
       dftUtils::printCurrentMemoryUsage(
@@ -63,10 +51,10 @@ namespace dftfe
     //
     dofHandler.clear();
     dofHandlerEigen.clear();
-    dofHandler.reinit(triangulation);
-    dofHandlerEigen.reinit(triangulation);
-    dofHandler.distribute_dofs(FE);
-    dofHandlerEigen.distribute_dofs(FEEigen);
+    dofHandler.reinit(triaObject);
+    dofHandlerEigen.reinit(triaObject);
+    dofHandler.distribute_dofs(fe);
+    dofHandlerEigen.distribute_dofs(feeigen);
 
     if (d_dftParamsPtr->verbosity >= 4)
       dftUtils::printCurrentMemoryUsage(mpi_communicator, "Distributed dofs");
@@ -96,7 +84,7 @@ namespace dftfe
 #ifdef USE_COMPLEX
     dealii::FEValuesExtractors::Scalar real(0); // For Eigen
     dealii::ComponentMask              componentMaskForRealDOF =
-      FEEigen.component_mask(real);
+      feeigen.component_mask(real);
     dealii::IndexSet selectedDofsReal =
       dealii::DoFTools::extract_dofs(dofHandlerEigen, componentMaskForRealDOF);
     std::vector<dealii::IndexSet::size_type> local_dof_indices(
@@ -283,7 +271,35 @@ namespace dftfe
         noConstraintsEigen.close();
 #endif
       }
+  }
 
+  template <unsigned int              FEOrder,
+            unsigned int              FEOrderElectro,
+            dftfe::utils::MemorySpace memorySpace>
+  void dftClass<FEOrder, FEOrderElectro, memorySpace>::initUnmovedTriangulation(
+    dealii::parallel::distributed::Triangulation<3> &triangulation)
+  {
+    computing_timer.enter_subsection("unmoved setup");
+
+    // initialize affine transformation object (must be done on unmoved
+    // triangulation)
+    if (d_dftParamsPtr->isCellStress)
+      d_affineTransformMesh.init(triangulation,
+                                 d_mesh.getSerialMeshUnmoved(),
+                                 d_domainBoundingVectors);
+
+    // initialize meshMovementGaussianClass object (must be done on unmoved
+    // triangulation) when not using floating charges
+    if (!d_dftParamsPtr->floatingNuclearCharges)
+      d_gaussianMovePar.init(triangulation,
+                             d_mesh.getSerialMeshUnmoved(),
+                             d_domainBoundingVectors);
+
+    if (d_dftParamsPtr->verbosity >= 4)
+      dftUtils::printCurrentMemoryUsage(
+        mpi_communicator,
+        "Inititialization of meshmovement class objects completed");
+    createDofHandlers(*FE, *FEEigen, triangulation);
     //
     // create 2p DoFHandler if Kerker density mixing is on
     //

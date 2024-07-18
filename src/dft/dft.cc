@@ -84,16 +84,7 @@ namespace dftfe
     const MPI_Comm &   _interBandGroupComm,
     const std::string &scratchFolderName,
     dftParameters &    dftParams)
-    : FE(dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1)
-    ,
-#ifdef USE_COMPLEX
-    FEEigen(dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 2)
-    ,
-#else
-    FEEigen(dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1)
-    ,
-#endif
-    mpi_communicator(mpi_comm_domain)
+    : mpi_communicator(mpi_comm_domain)
     , d_mpiCommParent(mpi_comm_parent)
     , interpoolcomm(_interpoolcomm)
     , interBandGroupComm(_interBandGroupComm)
@@ -159,6 +150,36 @@ namespace dftfe
     , d_phiPrimeSolverProblem(mpi_comm_domain)
     , d_mixingScheme(mpi_comm_parent, mpi_comm_domain, dftParams.verbosity)
   {
+    if (d_dftParamsPtr->usepCoarsenedSolve)
+      {
+        FE = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(
+            dealii::QGaussLobatto<1>(C_pCoarsenedFEOrder<FEOrder>() + 1)),
+          1);
+#ifdef USE_COMPLEX
+        FEEigen = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(
+            dealii::QGaussLobatto<1>(C_pCoarsenedFEOrder<FEOrder>() + 1)),
+          2);
+#else
+        FEEigen = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(
+            dealii::QGaussLobatto<1>(C_pCoarsenedFEOrder<FEOrder>() + 1)),
+          1);
+#endif
+      }
+    else
+      {
+        FE = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1);
+#ifdef USE_COMPLEX
+        FEEigen = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 2);
+#else
+        FEEigen = std::make_unique<dealii::FESystem<3>>(
+          dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1);
+#endif
+      }
     d_nOMPThreads = 1;
     if (const char *penv = std::getenv("DFTFE_NUM_THREADS"))
       {
@@ -1169,6 +1190,16 @@ namespace dftfe
     // initialize dirichlet BCs for total potential and vSelf poisson solutions
     //
     initBoundaryConditions();
+    double init_pref;
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime();
+    initpRefinedObjects();
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime() - init_pref;
+    if (d_dftParamsPtr->verbosity >= 4)
+      pcout << "initBoundaryConditions: Time taken for initpRefinedObjects: "
+            << init_pref << std::endl;
+
     d_smearedChargeMomentsComputed = false;
 
     if (d_dftParamsPtr->verbosity >= 4)
@@ -1376,6 +1407,17 @@ namespace dftfe
     const bool updateOnlyBinsBc = !updateImagesAndKPointsAndVselfBins;
     initBoundaryConditions(isMeshDeformed || d_dftParamsPtr->isCellStress,
                            updateOnlyBinsBc);
+    double init_pref;
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime();
+    initpRefinedObjects(isMeshDeformed || d_dftParamsPtr->isCellStress,
+                        updateOnlyBinsBc);
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime() - init_pref;
+    if (d_dftParamsPtr->verbosity >= 4)
+      pcout << "initBoundaryConditions: Time taken for initpRefinedObjects: "
+            << init_pref << std::endl;
+
     d_smearedChargeMomentsComputed = false;
     MPI_Barrier(d_mpiCommParent);
     init_bc = MPI_Wtime() - init_bc;
@@ -1551,6 +1593,118 @@ namespace dftfe
     computingTimerStandard.leave_subsection("KSDFT problem initialization");
   }
 
+  template <unsigned int              FEOrder,
+            unsigned int              FEOrderElectro,
+            dftfe::utils::MemorySpace memorySpace>
+  void
+  dftClass<FEOrder, FEOrderElectro, memorySpace>::initRemeshFromCoarsepMesh()
+  {
+    computingTimerStandard.enter_subsection("KSDFT problem initialization");
+    FE = std::make_unique<dealii::FESystem<3>>(
+      dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1);
+#ifdef USE_COMPLEX
+    FEEigen = std::make_unique<dealii::FESystem<3>>(
+      dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 2);
+#else
+    FEEigen = std::make_unique<dealii::FESystem<3>>(
+      dealii::FE_Q<3>(dealii::QGaussLobatto<1>(FEOrder + 1)), 1);
+#endif
+    createDofHandlers(*FE, *FEEigen, d_mesh.getParallelMeshMoved());
+
+#ifdef DFTFE_WITH_DEVICE
+    if constexpr (dftfe::utils::MemorySpace::DEVICE == memorySpace)
+      interpolatePsiTopRefinedMesh(d_eigenVectorsFlattenedDevice,
+                                   d_BLASWrapperPtr,
+                                   d_basisOperationsPtrDevice,
+                                   d_kPointWeights,
+                                   d_numEigenValues,
+                                   d_gllQuadratureIdFEOrder,
+                                   dofHandler,
+                                   constraintsNone,
+                                   d_mpiCommParent,
+                                   interpoolcomm,
+                                   interBandGroupComm,
+                                   *d_dftParamsPtr);
+    else
+#endif
+      interpolatePsiTopRefinedMesh(d_eigenVectorsFlattenedHost,
+                                   d_BLASWrapperPtrHost,
+                                   d_basisOperationsPtrHost,
+                                   d_kPointWeights,
+                                   d_numEigenValues,
+                                   d_gllQuadratureIdFEOrder,
+                                   dofHandler,
+                                   constraintsNone,
+                                   d_mpiCommParent,
+                                   interpoolcomm,
+                                   interBandGroupComm,
+                                   *d_dftParamsPtr);
+
+
+    //
+    // reinitialize dirichlet BCs for total potential and vSelf poisson
+    // solutions
+    //
+    double init_bc;
+    MPI_Barrier(d_mpiCommParent);
+    init_bc = MPI_Wtime();
+
+    initBoundaryConditions();
+    d_smearedChargeMomentsComputed = false;
+    MPI_Barrier(d_mpiCommParent);
+    init_bc = MPI_Wtime() - init_bc;
+    if (d_dftParamsPtr->verbosity >= 2)
+      pcout
+        << "initRemeshFromCoarsepMesh: Time taken for initBoundaryConditions: "
+        << init_bc << std::endl;
+
+    double init_rho;
+    MPI_Barrier(d_mpiCommParent);
+    init_rho = MPI_Wtime();
+
+    // initPsi();
+    noRemeshRhoDataInit();
+
+    MPI_Barrier(d_mpiCommParent);
+    init_rho = MPI_Wtime() - init_rho;
+    if (d_dftParamsPtr->verbosity >= 2)
+      pcout << "initRemeshFromCoarsepMesh: Time taken for initRho: " << init_rho
+            << std::endl;
+
+    //
+    // reinitialize pseudopotential related data structures
+    //
+    double init_pseudo;
+    MPI_Barrier(d_mpiCommParent);
+    init_pseudo = MPI_Wtime();
+
+    initPseudoPotentialAll();
+
+    MPI_Barrier(d_mpiCommParent);
+    init_pseudo = MPI_Wtime() - init_pseudo;
+    if (d_dftParamsPtr->verbosity >= 2)
+      pcout << "Time taken for initPseudoPotentialAll: " << init_pseudo
+            << std::endl;
+
+    d_isFirstFilteringCall.clear();
+    d_isFirstFilteringCall.resize((d_dftParamsPtr->spinPolarized + 1) *
+                                    d_kPointWeights.size(),
+                                  true);
+
+    double init_ksoperator;
+    MPI_Barrier(d_mpiCommParent);
+    init_ksoperator = MPI_Wtime();
+
+    initializeKohnShamDFTOperator();
+
+    init_ksoperator = MPI_Wtime() - init_ksoperator;
+    if (d_dftParamsPtr->verbosity >= 2)
+      pcout << "Time taken for kohnShamDFTOperator class reinitialization: "
+            << init_ksoperator << std::endl;
+
+    computingTimerStandard.leave_subsection("KSDFT problem initialization");
+  }
+
   //
   // deform domain and call appropriate reinits
   //
@@ -1705,6 +1859,17 @@ namespace dftfe
         // first true option only updates the boundary conditions
         // second true option signals update is only for vself perturbation
         initBoundaryConditions(true, true, true);
+        double init_pref;
+        MPI_Barrier(d_mpiCommParent);
+        init_pref = MPI_Wtime();
+        initpRefinedObjects(true, true, true);
+        MPI_Barrier(d_mpiCommParent);
+        init_pref = MPI_Wtime() - init_pref;
+        if (d_dftParamsPtr->verbosity >= 4)
+          pcout
+            << "initBoundaryConditions: Time taken for initpRefinedObjects: "
+            << init_pref << std::endl;
+
         d_smearedChargeMomentsComputed = false;
         MPI_Barrier(d_mpiCommParent);
         init_bc = MPI_Wtime() - init_bc;
@@ -1893,6 +2058,16 @@ namespace dftfe
   dftClass<FEOrder, FEOrderElectro, memorySpace>::trivialSolveForStress()
   {
     initBoundaryConditions();
+    double init_pref;
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime();
+    initpRefinedObjects();
+    MPI_Barrier(d_mpiCommParent);
+    init_pref = MPI_Wtime() - init_pref;
+    if (d_dftParamsPtr->verbosity >= 4)
+      pcout << "initBoundaryConditions: Time taken for initpRefinedObjects: "
+            << init_pref << std::endl;
+
     noRemeshRhoDataInit();
     solve(false, true);
   }
@@ -1948,11 +2123,7 @@ namespace dftfe
         d_mpiCommParent,
         mpi_communicator);
 
-
-    KohnShamHamiltonianOperator<memorySpace> &kohnShamDFTEigenOperator =
-      *d_kohnShamDFTOperatorPtr;
-
-    kohnShamDFTEigenOperator.init(d_kPointCoordinates, d_kPointWeights);
+    d_kohnShamDFTOperatorPtr->init(d_kPointCoordinates, d_kPointWeights);
 
 #ifdef DFTFE_WITH_DEVICE
     if (d_dftParamsPtr->useDevice)
@@ -2067,9 +2238,6 @@ namespace dftfe
     const bool computestress,
     const bool isRestartGroundStateCalcFromChk)
   {
-    KohnShamHamiltonianOperator<memorySpace> &kohnShamDFTEigenOperator =
-      *d_kohnShamDFTOperatorPtr;
-
     const dealii::Quadrature<3> &quadrature =
       matrix_free_data.get_quadrature(d_densityQuadratureId);
 
@@ -2155,7 +2323,7 @@ namespace dftfe
         d_baseDofHandlerIndexElectro,
         d_phiTotAXQuadratureIdElectro,
         d_binsStartDofHandlerIndexElectro,
-        FEOrder == FEOrderElectro ?
+        (FEOrder == FEOrderElectro) && !(d_dftParamsPtr->usepCoarsenedSolve) ?
           d_basisOperationsPtrDevice->cellStiffnessMatrixBasisData() :
           d_basisOperationsPtrElectroDevice->cellStiffnessMatrixBasisData(),
         d_BLASWrapperPtr,
@@ -2235,7 +2403,7 @@ namespace dftfe
                                  d_pseudoVLoc,
                                  d_pseudoVLocAtoms);
 
-        kohnShamDFTEigenOperator.computeVEffExternalPotCorr(d_pseudoVLoc);
+        d_kohnShamDFTOperatorPtr->computeVEffExternalPotCorr(d_pseudoVLoc);
         computingTimerStandard.leave_subsection("Init local PSP");
       }
 
@@ -2252,8 +2420,8 @@ namespace dftfe
         1e+4 :
         (d_dftParamsPtr->mixingMethod == "ANDERSON_WITH_KERKER" ||
              d_dftParamsPtr->mixingMethod == "ANDERSON_WITH_RESTA" ?
-           1e-2 :
-           2e-2);
+           1e-3 :
+           2e-3);
 
 
     if (d_dftParamsPtr->solverMode == "MD")
@@ -2348,13 +2516,23 @@ namespace dftfe
     // CAUTION: Choosing a looser tolerance might lead to failed tests
     const double adaptiveChebysevFilterPassesTol =
       d_dftParamsPtr->chebyshevTolerance;
-    bool scfConverged = false;
+    bool scfConverged           = false;
+    bool pCoarsenedSCFConverged = false;
+    bool ispCoarsenedMesh       = d_dftParamsPtr->usepCoarsenedSolve;
     pcout << std::endl;
     if (d_dftParamsPtr->verbosity == 0)
       pcout << "Starting SCF iterations...." << std::endl;
     while (!scfConverged && (scfIter < d_dftParamsPtr->numSCFIterations))
       {
         dealii::Timer local_timer(d_mpiCommParent, true);
+        if (pCoarsenedSCFConverged && ispCoarsenedMesh)
+          {
+            initRemeshFromCoarsepMesh();
+            d_kohnShamDFTOperatorPtr->computeVEffExternalPotCorr(d_pseudoVLoc);
+            ispCoarsenedMesh = false;
+            norm             = 1.0;
+          }
+        bool firstPassRefined = pCoarsenedSCFConverged && !ispCoarsenedMesh;
         if (d_dftParamsPtr->verbosity >= 1)
           pcout
             << "************************Begin Self-Consistent-Field Iteration: "
@@ -2364,7 +2542,7 @@ namespace dftfe
         // Mixing scheme
         //
         computing_timer.enter_subsection("density mixing");
-        if (scfIter > 0)
+        if (scfIter > 0 && !firstPassRefined)
           {
             if (d_dftParamsPtr->mixingMethod == "LOW_RANK_DIELECM_PRECOND")
               {
@@ -2584,6 +2762,10 @@ namespace dftfe
                  d_dftParamsPtr->selfConsistentSolverEnergyTolerance)))
           scfConverged = true;
 
+        if ((!(norm > d_dftParamsPtr->pCoarsenedSolveTolerance)) &&
+            ispCoarsenedMesh)
+          pCoarsenedSCFConverged = true;
+
         if (d_dftParamsPtr->multipoleBoundaryConditions)
           {
             computing_timer.enter_subsection("Update inhomogenous BC");
@@ -2793,25 +2975,25 @@ namespace dftfe
             for (unsigned int s = 0; s < 2; ++s)
               {
                 computing_timer.enter_subsection("VEff Computation");
-                kohnShamDFTEigenOperator.computeVEff(d_densityInQuadValues,
-                                                     d_gradDensityInQuadValues,
-                                                     d_phiInQuadValues,
-                                                     d_rhoCore,
-                                                     d_gradRhoCore,
-                                                     s);
+                d_kohnShamDFTOperatorPtr->computeVEff(d_densityInQuadValues,
+                                                      d_gradDensityInQuadValues,
+                                                      d_phiInQuadValues,
+                                                      d_rhoCore,
+                                                      d_gradRhoCore,
+                                                      s);
                 computing_timer.leave_subsection("VEff Computation");
 
 
                 for (unsigned int kPoint = 0; kPoint < d_kPointWeights.size();
                      ++kPoint)
                   {
-                    kohnShamDFTEigenOperator.reinitkPointSpinIndex(kPoint, s);
+                    d_kohnShamDFTOperatorPtr->reinitkPointSpinIndex(kPoint, s);
 
 
 
                     computing_timer.enter_subsection(
                       "Hamiltonian Matrix Computation");
-                    kohnShamDFTEigenOperator.computeCellHamiltonianMatrix();
+                    d_kohnShamDFTOperatorPtr->computeCellHamiltonianMatrix();
                     computing_timer.leave_subsection(
                       "Hamiltonian Matrix Computation");
 
@@ -2830,11 +3012,11 @@ namespace dftfe
                           kohnShamEigenSpaceCompute(
                             s,
                             kPoint,
-                            kohnShamDFTEigenOperator,
+                            *d_kohnShamDFTOperatorPtr,
                             *d_elpaScala,
                             d_subspaceIterationSolverDevice,
                             residualNormWaveFunctionsAllkPointsSpins[s][kPoint],
-                            (scfIter == 0 ||
+                            (scfIter == 0 || firstPassRefined ||
                              d_dftParamsPtr
                                ->allowMultipleFilteringPassesAfterFirstScf) ?
                               true :
@@ -2846,18 +3028,18 @@ namespace dftfe
                               false :
                               true,
                             scfConverged ? false : true,
-                            scfIter == 0);
+                            scfIter == 0 || firstPassRefined);
 #endif
                         if constexpr (dftfe::utils::MemorySpace::HOST ==
                                       memorySpace)
                           kohnShamEigenSpaceCompute(
                             s,
                             kPoint,
-                            kohnShamDFTEigenOperator,
+                            *d_kohnShamDFTOperatorPtr,
                             *d_elpaScala,
                             d_subspaceIterationSolver,
                             residualNormWaveFunctionsAllkPointsSpins[s][kPoint],
-                            (scfIter == 0 ||
+                            (scfIter == 0 || firstPassRefined ||
                              d_dftParamsPtr
                                ->allowMultipleFilteringPassesAfterFirstScf) ?
                               true :
@@ -2868,7 +3050,7 @@ namespace dftfe
                               false :
                               true,
                             scfConverged ? false : true,
-                            scfIter == 0);
+                            scfIter == 0 || firstPassRefined);
                       }
                   }
               }
@@ -2899,7 +3081,7 @@ namespace dftfe
             unsigned int count = 1;
 
             if (!scfConverged &&
-                (scfIter == 0 ||
+                (scfIter == 0 || firstPassRefined ||
                  d_dftParamsPtr->allowMultipleFilteringPassesAfterFirstScf))
               {
                 // maximum of the residual norm of the state closest to and
@@ -2928,12 +3110,16 @@ namespace dftfe
                 // This improves the scf convergence performance.
 
                 const double filterPassTol =
-                  (scfIter == 0 && isRestartGroundStateCalcFromChk) ?
-                    1.0e-8 :
-                    ((scfIter == 0 &&
-                      adaptiveChebysevFilterPassesTol > firstScfChebyTol) ?
-                       firstScfChebyTol :
-                       adaptiveChebysevFilterPassesTol);
+                  firstPassRefined ?
+                    1.0e-2 :
+                    ((scfIter == 0 && isRestartGroundStateCalcFromChk) ?
+                       1.0e-8 :
+                       ((scfIter == 0 &&
+                         adaptiveChebysevFilterPassesTol > firstScfChebyTol) ?
+                          firstScfChebyTol :
+                          adaptiveChebysevFilterPassesTol));
+                pCoarsenedSCFConverged =
+                  firstPassRefined ? false : pCoarsenedSCFConverged;
                 while (maxRes > filterPassTol && count < 100)
                   {
                     for (unsigned int s = 0; s < 2; ++s)
@@ -2942,7 +3128,7 @@ namespace dftfe
                           {
                             computing_timer.enter_subsection(
                               "VEff Computation");
-                            kohnShamDFTEigenOperator.computeVEff(
+                            d_kohnShamDFTOperatorPtr->computeVEff(
                               d_densityInQuadValues,
                               d_gradDensityInQuadValues,
                               d_phiInQuadValues,
@@ -2961,14 +3147,14 @@ namespace dftfe
                                     << 1 + count << " for spin " << s + 1
                                     << std::endl;
 
-                            kohnShamDFTEigenOperator.reinitkPointSpinIndex(
+                            d_kohnShamDFTOperatorPtr->reinitkPointSpinIndex(
                               kPoint, s);
                             if (d_dftParamsPtr->memOptMode)
                               {
                                 computing_timer.enter_subsection(
                                   "Hamiltonian Matrix Computation");
-                                kohnShamDFTEigenOperator
-                                  .computeCellHamiltonianMatrix();
+                                d_kohnShamDFTOperatorPtr
+                                  ->computeCellHamiltonianMatrix();
                                 computing_timer.leave_subsection(
                                   "Hamiltonian Matrix Computation");
                               }
@@ -2979,7 +3165,7 @@ namespace dftfe
                               kohnShamEigenSpaceCompute(
                                 s,
                                 kPoint,
-                                kohnShamDFTEigenOperator,
+                                *d_kohnShamDFTOperatorPtr,
                                 *d_elpaScala,
                                 d_subspaceIterationSolverDevice,
                                 residualNormWaveFunctionsAllkPointsSpins
@@ -2991,14 +3177,14 @@ namespace dftfe
                                   false :
                                   true,
                                 true,
-                                scfIter == 0);
+                                scfIter == 0 || firstPassRefined);
 #endif
                             if constexpr (dftfe::utils::MemorySpace::HOST ==
                                           memorySpace)
                               kohnShamEigenSpaceCompute(
                                 s,
                                 kPoint,
-                                kohnShamDFTEigenOperator,
+                                *d_kohnShamDFTOperatorPtr,
                                 *d_elpaScala,
                                 d_subspaceIterationSolver,
                                 residualNormWaveFunctionsAllkPointsSpins
@@ -3009,7 +3195,7 @@ namespace dftfe
                                   false :
                                   true,
                                 true,
-                                scfIter == 0);
+                                scfIter == 0 || firstPassRefined);
                           }
                       }
 
@@ -3075,23 +3261,23 @@ namespace dftfe
                   d_numEigenValuesRR);
 
             computing_timer.enter_subsection("VEff Computation");
-            kohnShamDFTEigenOperator.computeVEff(d_densityInQuadValues,
-                                                 d_gradDensityInQuadValues,
-                                                 d_phiInQuadValues,
-                                                 d_rhoCore,
-                                                 d_gradRhoCore);
+            d_kohnShamDFTOperatorPtr->computeVEff(d_densityInQuadValues,
+                                                  d_gradDensityInQuadValues,
+                                                  d_phiInQuadValues,
+                                                  d_rhoCore,
+                                                  d_gradRhoCore);
             computing_timer.leave_subsection("VEff Computation");
 
 
             for (unsigned int kPoint = 0; kPoint < d_kPointWeights.size();
                  ++kPoint)
               {
-                kohnShamDFTEigenOperator.reinitkPointSpinIndex(kPoint, 0);
+                d_kohnShamDFTOperatorPtr->reinitkPointSpinIndex(kPoint, 0);
 
 
                 computing_timer.enter_subsection(
                   "Hamiltonian Matrix Computation");
-                kohnShamDFTEigenOperator.computeCellHamiltonianMatrix();
+                d_kohnShamDFTOperatorPtr->computeCellHamiltonianMatrix();
                 computing_timer.leave_subsection(
                   "Hamiltonian Matrix Computation");
 
@@ -3111,11 +3297,11 @@ namespace dftfe
                       kohnShamEigenSpaceCompute(
                         0,
                         kPoint,
-                        kohnShamDFTEigenOperator,
+                        *d_kohnShamDFTOperatorPtr,
                         *d_elpaScala,
                         d_subspaceIterationSolverDevice,
                         residualNormWaveFunctionsAllkPoints[kPoint],
-                        (scfIter == 0 ||
+                        (scfIter == 0 || firstPassRefined ||
                          d_dftParamsPtr
                            ->allowMultipleFilteringPassesAfterFirstScf) ?
                           true :
@@ -3127,18 +3313,18 @@ namespace dftfe
                           false :
                           true,
                         scfConverged ? false : true,
-                        scfIter == 0);
+                        scfIter == 0 || firstPassRefined);
 #endif
                     if constexpr (dftfe::utils::MemorySpace::HOST ==
                                   memorySpace)
                       kohnShamEigenSpaceCompute(
                         0,
                         kPoint,
-                        kohnShamDFTEigenOperator,
+                        *d_kohnShamDFTOperatorPtr,
                         *d_elpaScala,
                         d_subspaceIterationSolver,
                         residualNormWaveFunctionsAllkPoints[kPoint],
-                        (scfIter == 0 ||
+                        (scfIter == 0 || firstPassRefined ||
                          d_dftParamsPtr
                            ->allowMultipleFilteringPassesAfterFirstScf) ?
                           true :
@@ -3149,7 +3335,7 @@ namespace dftfe
                           false :
                           true,
                         scfConverged ? false : true,
-                        scfIter == 0);
+                        scfIter == 0 || firstPassRefined);
                   }
               }
 
@@ -3165,7 +3351,7 @@ namespace dftfe
             unsigned int count = 1;
 
             if (!scfConverged &&
-                (scfIter == 0 ||
+                (scfIter == 0 || firstPassRefined ||
                  d_dftParamsPtr->allowMultipleFilteringPassesAfterFirstScf))
               {
                 //
@@ -3189,12 +3375,16 @@ namespace dftfe
                 // This improves the scf convergence performance.
 
                 const double filterPassTol =
-                  (scfIter == 0 && isRestartGroundStateCalcFromChk) ?
-                    1.0e-8 :
-                    ((scfIter == 0 &&
-                      adaptiveChebysevFilterPassesTol > firstScfChebyTol) ?
-                       firstScfChebyTol :
-                       adaptiveChebysevFilterPassesTol);
+                  firstPassRefined ?
+                    1.0e-2 :
+                    ((scfIter == 0 && isRestartGroundStateCalcFromChk) ?
+                       1.0e-8 :
+                       ((scfIter == 0 &&
+                         adaptiveChebysevFilterPassesTol > firstScfChebyTol) ?
+                          firstScfChebyTol :
+                          adaptiveChebysevFilterPassesTol));
+                pCoarsenedSCFConverged =
+                  firstPassRefined ? false : pCoarsenedSCFConverged;
                 while (maxRes > filterPassTol && count < 100)
                   {
                     for (unsigned int kPoint = 0;
@@ -3205,15 +3395,15 @@ namespace dftfe
                           pcout << "Beginning Chebyshev filter pass "
                                 << 1 + count << std::endl;
 
-                        kohnShamDFTEigenOperator.reinitkPointSpinIndex(kPoint,
-                                                                       0);
+                        d_kohnShamDFTOperatorPtr->reinitkPointSpinIndex(kPoint,
+                                                                        0);
                         if (d_dftParamsPtr->memOptMode &&
                             d_kPointWeights.size() > 0)
                           {
                             computing_timer.enter_subsection(
                               "Hamiltonian Matrix Computation");
-                            kohnShamDFTEigenOperator
-                              .computeCellHamiltonianMatrix();
+                            d_kohnShamDFTOperatorPtr
+                              ->computeCellHamiltonianMatrix();
                             computing_timer.leave_subsection(
                               "Hamiltonian Matrix Computation");
                           }
@@ -3225,7 +3415,7 @@ namespace dftfe
                           kohnShamEigenSpaceCompute(
                             0,
                             kPoint,
-                            kohnShamDFTEigenOperator,
+                            *d_kohnShamDFTOperatorPtr,
                             *d_elpaScala,
                             d_subspaceIterationSolverDevice,
                             residualNormWaveFunctionsAllkPoints[kPoint],
@@ -3236,7 +3426,7 @@ namespace dftfe
                               false :
                               true,
                             true,
-                            scfIter == 0);
+                            scfIter == 0 || firstPassRefined);
 
 #endif
                         if constexpr (dftfe::utils::MemorySpace::HOST ==
@@ -3244,7 +3434,7 @@ namespace dftfe
                           kohnShamEigenSpaceCompute(
                             0,
                             kPoint,
-                            kohnShamDFTEigenOperator,
+                            *d_kohnShamDFTOperatorPtr,
                             *d_elpaScala,
                             d_subspaceIterationSolver,
                             residualNormWaveFunctionsAllkPoints[kPoint],
@@ -3254,7 +3444,7 @@ namespace dftfe
                               false :
                               true,
                             true,
-                            scfIter == 0);
+                            scfIter == 0 || firstPassRefined);
                       }
 
                     //
@@ -3894,9 +4084,6 @@ namespace dftfe
   void
   dftClass<FEOrder, FEOrderElectro, memorySpace>::computeStress()
   {
-    KohnShamHamiltonianOperator<memorySpace> &kohnShamDFTEigenOperator =
-      *d_kohnShamDFTOperatorPtr;
-
     if (d_dftParamsPtr->isPseudopotential ||
         d_dftParamsPtr->smearedNuclearCharges)
       {
@@ -3992,7 +4179,8 @@ namespace dftfe
             d_phiTotAXQuadratureIdElectro,
             d_binsStartDofHandlerIndexElectro,
 #ifdef DFTFE_WITH_DEVICE
-            FEOrder == FEOrderElectro ?
+            (FEOrder == FEOrderElectro) &&
+                !(d_dftParamsPtr->usepCoarsenedSolve) ?
               d_basisOperationsPtrDevice->cellStiffnessMatrixBasisData() :
               d_basisOperationsPtrElectroDevice->cellStiffnessMatrixBasisData(),
             d_BLASWrapperPtr,
@@ -4040,7 +4228,8 @@ namespace dftfe
             d_phiTotAXQuadratureIdElectro,
             d_binsStartDofHandlerIndexElectro,
 #ifdef DFTFE_WITH_DEVICE
-            FEOrder == FEOrderElectro ?
+            (FEOrder == FEOrderElectro) &&
+                !(d_dftParamsPtr->usepCoarsenedSolve) ?
               d_basisOperationsPtrDevice->cellStiffnessMatrixBasisData() :
               d_basisOperationsPtrElectroDevice->cellStiffnessMatrixBasisData(),
             d_BLASWrapperPtr,
@@ -4736,7 +4925,7 @@ namespace dftfe
 
         const dealii::Quadrature<3> &quadrature_formula =
           matrix_free_data.get_quadrature(d_densityQuadratureId);
-        dealii::FEValues<3> fe_values(FE,
+        dealii::FEValues<3> fe_values(*FE,
                                       quadrature_formula,
                                       dealii::update_quadrature_points |
                                         dealii::update_JxW_values);

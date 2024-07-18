@@ -40,8 +40,8 @@ namespace dftfe
     //
     // initialize FE objects again
     //
-    dofHandler.distribute_dofs(FE);
-    dofHandlerEigen.distribute_dofs(FEEigen);
+    dofHandler.distribute_dofs(*FE);
+    dofHandlerEigen.distribute_dofs(*FEEigen);
 
     if (!vselfPerturbationUpdateForStress)
       {
@@ -229,12 +229,16 @@ namespace dftfe
     quadratureVector.push_back(dealii::QGauss<1>(C_num1DQuad<FEOrder>()));
     // SparsityPattern VEctor
     quadratureVector.push_back(dealii::QGauss<1>(8));
+    if (d_dftParamsPtr->usepCoarsenedSolve &&
+        FE->tensor_degree() == C_pCoarsenedFEOrder<FEOrder>())
+      quadratureVector.push_back(dealii::QGaussLobatto<1>(FEOrder + 1));
     d_densityQuadratureId         = 0;
     d_nlpspQuadratureId           = 1;
     d_gllQuadratureId             = 2;
     d_lpspQuadratureId            = 3;
     d_feOrderPlusOneQuadratureId  = 4;
     d_sparsityPatternQuadratureId = 5;
+    d_gllQuadratureIdFEOrder      = 6;
 
     double init_force;
     MPI_Barrier(d_mpiCommParent);
@@ -295,6 +299,12 @@ namespace dftfe
               updateFlagsAll,
               updateFlagsAll,
               updateFlagsAll};
+            if (d_dftParamsPtr->usepCoarsenedSolve &&
+                FE->tensor_degree() == C_pCoarsenedFEOrder<FEOrder>())
+              {
+                quadratureIndices.push_back(d_gllQuadratureIdFEOrder);
+                updateFlags.push_back(updateFlagsAll);
+              }
             d_basisOperationsPtrHost->init(matrix_free_data,
                                            d_constraintsVector,
                                            d_densityDofHandlerIndex,
@@ -465,24 +475,6 @@ namespace dftfe
 
     // compute volume of the domain
     d_domainVolume = computeVolume(dofHandler);
-
-    double init_pref;
-    MPI_Barrier(d_mpiCommParent);
-    init_pref = MPI_Wtime();
-    //
-    // init 2p matrix-free objects using appropriate constraint matrix and
-    // quadrature rule
-    //
-    initpRefinedObjects(recomputeBasisData,
-                        meshOnlyDeformed,
-                        vselfPerturbationUpdateForStress);
-
-
-    MPI_Barrier(d_mpiCommParent);
-    init_pref = MPI_Wtime() - init_pref;
-    if (d_dftParamsPtr->verbosity >= 4)
-      pcout << "initBoundaryConditions: Time taken for initpRefinedObjects: "
-            << init_pref << std::endl;
 
     if (!meshOnlyDeformed)
       {

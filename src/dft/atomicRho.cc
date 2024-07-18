@@ -114,7 +114,7 @@ namespace dftfe
     //
     const dealii::Quadrature<3> &quadrature_formula =
       matrix_free_data.get_quadrature(d_densityQuadratureId);
-    dealii::FEValues<3> fe_values(FE,
+    dealii::FEValues<3> fe_values(*FE,
                                   quadrature_formula,
                                   dealii::update_quadrature_points);
     const unsigned int  n_q_points = quadrature_formula.size();

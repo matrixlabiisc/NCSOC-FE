@@ -163,7 +163,27 @@ namespace dftfe
                  const bool useSingleAtomSolutionOverride      = false,
                  const bool isMeshDeformed                     = false);
 
+    void
+    initRemeshFromCoarsepMesh();
 
+
+    void
+    interpolatePsiTopRefinedMesh(
+      dftfe::utils::MemoryStorage<dataTypes::number, memorySpace> &Psi,
+      std::shared_ptr<dftfe::linearAlgebra::BLASWrapper<memorySpace>>
+        BLASWrapperPtr,
+      std::shared_ptr<
+        dftfe::basis::FEBasisOperations<dataTypes::number, double, memorySpace>>
+        &                                      basisOperationsPtrSrc,
+      const std::vector<double> &              kPointWeights,
+      const unsigned int                       totalNumWaveFunctions,
+      const unsigned int                       quadratureIndex,
+      const dealii::DoFHandler<3> &            dofHandlerDst,
+      const dealii::AffineConstraints<double> &constraintMatrixDst,
+      const MPI_Comm &                         mpiCommParent,
+      const MPI_Comm &                         interpoolcomm,
+      const MPI_Comm &                         interBandGroupComm,
+      const dftParameters &                    dftParams);
 
     /**
      * @brief FIXME: legacy call, move to main.cc
@@ -566,13 +586,19 @@ namespace dftfe
     void createpRefinedDofHandler(
       dealii::parallel::distributed::Triangulation<3> &triangulation);
     void
-    initpRefinedObjects(const bool recomputeBasisData,
-                        const bool meshOnlyDeformed,
+    initpRefinedObjects(const bool recomputeBasisData               = true,
+                        const bool meshOnlyDeformed                 = false,
                         const bool vselfPerturbationUpdateForStress = false);
 
 
     void
     updatePRefinedConstraints();
+
+    void createDofHandlers(
+      dealii::FESystem<3> &fe,
+      dealii::FESystem<3> &feeigen,
+
+      dealii::parallel::distributed::Triangulation<3> &triangulation);
 
     /**
      *@brief Sets inhomegeneous dirichlet boundary conditions upto quadrupole for total potential constraints on
@@ -726,6 +752,8 @@ namespace dftfe
 
     double d_atomicRhoScalingFac;
 
+    void
+    initPsi();
     void
     initRho();
     void
@@ -1209,7 +1237,7 @@ namespace dftfe
     /**
      * dealii based FE data structres
      */
-    dealii::FESystem<3>   FE, FEEigen;
+    std::unique_ptr<dealii::FESystem<3>> FE, FEEigen;
     dealii::DoFHandler<3> dofHandler, dofHandlerEigen, d_dofHandlerPRefined,
       d_dofHandlerRhoNodal;
     unsigned int d_eigenDofHandlerIndex, d_phiExtDofHandlerIndexElectro,
@@ -1225,6 +1253,7 @@ namespace dftfe
     unsigned int                  d_feOrderPlusOneQuadratureId;
     unsigned int                  d_lpspQuadratureIdElectro;
     unsigned int                  d_gllQuadratureId;
+    unsigned int                  d_gllQuadratureIdFEOrder;
     unsigned int                  d_phiTotDofHandlerIndexElectro;
     unsigned int                  d_phiPrimeDofHandlerIndexElectro;
     unsigned int                  d_phiTotAXQuadratureIdElectro;

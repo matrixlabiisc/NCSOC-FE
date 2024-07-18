@@ -135,6 +135,7 @@ SET(TARGET_SRC
   ./src/dft/kerker.cc
   ./src/dft/pRefinedDoFHandler.cc
   ./src/dft/psiInitialGuess.cc
+  ./src/dft/interpolatePsiTopRefinedMesh.cc
   ./src/dft/publicMethods.cc
   ./src/dft/restart.cc
   ./src/dft/solveNSCF.cc
