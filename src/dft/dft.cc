@@ -2666,7 +2666,7 @@ namespace dftfe
                 std::vector<mixingVariable> andersonMixingVariables =
                   mixingVariables;
                 if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
-                  andersonMixingVariables.push_back(mixingVariable::gradPhi);
+                  andersonMixingVariables[0] = mixingVariable::gradPhi;
 
                 // Compute the mixing coefficients
                 d_mixingScheme.computeAndersonMixingCoeff(andersonMixingVariables);
