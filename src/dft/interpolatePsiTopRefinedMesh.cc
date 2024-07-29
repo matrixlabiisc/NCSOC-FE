@@ -83,8 +83,8 @@ namespace dftfe
     const unsigned int remCellBlockSize =
       totalLocallyOwnedCells - numCellBlocks * cellsBlockSize;
     basisOperationsPtrSrc->reinit(BVec * numWfnSpinors,
-                               cellsBlockSize,
-                               quadratureIndex);
+                                  cellsBlockSize,
+                                  quadratureIndex);
     const unsigned int numQuadPoints = basisOperationsPtrSrc->nQuadsPerCell();
 
     dftfe::utils::MemoryStorage<dataTypes::number, memorySpace>
@@ -293,8 +293,8 @@ namespace dftfe
                     jvec,
                     (*flattenedArrayBlockDst).data(),
                     PsiDst.data() + numLocalDofsDst * numWfnSpinors *
-                                   totalNumWaveFunctions *
-                                   (numSpinComponents * kPoint + spinIndex));
+                                      totalNumWaveFunctions *
+                                      (numSpinComponents * kPoint + spinIndex));
                 }
             }
         }

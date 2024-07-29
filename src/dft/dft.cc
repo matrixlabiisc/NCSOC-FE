@@ -2472,6 +2472,25 @@ namespace dftfe
             d_dftParamsPtr->mixingParameter *
               (iMix > 0 ? d_dftParamsPtr->spinMixingEnhancementFactor : 1.0),
             d_dftParamsPtr->adaptAndersonMixingParameter);
+        if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+          {
+            dftfe::utils::MemoryStorage<double,
+            dftfe::utils::MemorySpace::HOST>
+              gradRhoJxW;
+            gradRhoJxW.resize(
+              d_basisOperationsPtrElectroHost->JxWBasisData().size() * 3,
+              0.0);
+            for (unsigned int i = 0; i < gradRhoJxW.size(); ++i)
+              gradRhoJxW[i] =
+                d_basisOperationsPtrElectroHost->JxWBasisData()[i /
+                3]*d_dftParamsPtr->inverseKerkerMixingParameter;
+            d_mixingScheme.addMixingVariable(
+              mixingVariable::gradPhi,
+              gradRhoJxW,
+              true,
+              d_dftParamsPtr->mixingParameter,
+              d_dftParamsPtr->adaptAndersonMixingParameter);
+          }
       }
     else if (d_dftParamsPtr->mixingMethod == "ANDERSON")
       {
@@ -2503,6 +2522,23 @@ namespace dftfe
                   (iMix > 0 ? d_dftParamsPtr->spinMixingEnhancementFactor :
                               1.0),
                 d_dftParamsPtr->adaptAndersonMixingParameter);
+          }
+        if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+          {
+            dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
+              gradRhoJxW;
+            gradRhoJxW.resize(
+              d_basisOperationsPtrElectroHost->JxWBasisData().size() * 3, 0.0);
+            for (unsigned int i = 0; i < gradRhoJxW.size(); ++i)
+              gradRhoJxW[i] =
+                d_basisOperationsPtrElectroHost->JxWBasisData()[i / 3] *
+                d_dftParamsPtr->inverseKerkerMixingParameter;
+            d_mixingScheme.addMixingVariable(
+              mixingVariable::gradPhi,
+              gradRhoJxW,
+              true,
+              d_dftParamsPtr->mixingParameter,
+              d_dftParamsPtr->adaptAndersonMixingParameter);
           }
       }
     //
@@ -2576,6 +2612,68 @@ namespace dftfe
                       d_densityInNodalValues[iComp],
                       d_densityResidualNodalValues[iComp]);
                   }
+                //                 applyKerkerPreconditionerToTotalDensityResidual(
+                // #ifdef DFTFE_WITH_DEVICE
+                //                   kerkerPreconditionedResidualSolverProblemDevice,
+                //                   CGSolverDevice,
+                // #endif
+                //                   kerkerPreconditionedResidualSolverProblem,
+                //                   CGSolver,
+                //                   d_densityResidualNodalValues[0],
+                //                   d_preCondTotalDensityResidualVector);
+                for (unsigned int iComp = 0;
+                     iComp < d_densityOutNodalValues.size();
+                     ++iComp)
+                  {
+                    d_mixingScheme.addVariableToInHist(
+                      mixingVariables[iComp],
+                      d_densityInNodalValues[iComp].begin(),
+                      d_densityInNodalValues[iComp].locally_owned_size());
+                    // d_mixingScheme.addVariableToResidualHist(
+                    //   mixingVariables[iComp],
+                    //   mixingVariable::rho == mixingVariables[iComp] ?
+                    //     d_preCondTotalDensityResidualVector.begin() :
+                    //     d_densityResidualNodalValues[iComp].begin(),
+                    //   d_preCondTotalDensityResidualVector.locally_owned_size());
+                    d_mixingScheme.addVariableToResidualHist(
+                      mixingVariables[iComp],
+                      d_densityResidualNodalValues[iComp].begin(),
+                      d_densityResidualNodalValues[iComp].locally_owned_size());
+                  }
+                if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+                  {
+                    if (scfIter == 1)
+                      d_gradPhiResQuadValues.resize(
+                        d_gradPhiOutQuadValues.size());
+                    computeResidualQuadData(
+                      d_gradPhiOutQuadValues,
+                      d_gradPhiInQuadValues,
+                      d_gradPhiResQuadValues,
+                      d_basisOperationsPtrElectroHost->JxWBasisData(),
+                      false);
+                    d_mixingScheme.addVariableToInHist(
+                      mixingVariable::gradPhi,
+                      d_gradPhiInQuadValues.data(),
+                      d_gradPhiInQuadValues.size());
+                    d_mixingScheme.addVariableToResidualHist(
+                      mixingVariable::gradPhi,
+                      d_gradPhiResQuadValues.data(),
+                      d_gradPhiResQuadValues.size());
+                  }
+                // Delete old history if it exceeds a pre-described
+                // length
+                d_mixingScheme.popOldHistory(d_dftParamsPtr->mixingHistory);
+                std::vector<mixingVariable> andersonMixingVariables =
+                  mixingVariables;
+                if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+                  andersonMixingVariables.push_back(mixingVariable::gradPhi);
+
+                // Compute the mixing coefficients
+                d_mixingScheme.computeAndersonMixingCoeff(andersonMixingVariables);
+                d_mixingScheme.getOptimizedResidual(
+                  mixingVariables[0],
+                  d_densityResidualNodalValues[0].begin(),
+                  d_densityResidualNodalValues[0].locally_owned_size());
                 applyKerkerPreconditionerToTotalDensityResidual(
 #ifdef DFTFE_WITH_DEVICE
                   kerkerPreconditionedResidualSolverProblemDevice,
@@ -2585,28 +2683,12 @@ namespace dftfe
                   CGSolver,
                   d_densityResidualNodalValues[0],
                   d_preCondTotalDensityResidualVector);
-                for (unsigned int iComp = 0;
-                     iComp < d_densityOutNodalValues.size();
-                     ++iComp)
-                  {
-                    d_mixingScheme.addVariableToInHist(
-                      mixingVariables[iComp],
-                      d_densityInNodalValues[iComp].begin(),
-                      d_densityInNodalValues[iComp].locally_owned_size());
-                    d_mixingScheme.addVariableToResidualHist(
-                      mixingVariables[iComp],
-                      mixingVariable::rho == mixingVariables[iComp] ?
-                        d_preCondTotalDensityResidualVector.begin() :
-                        d_densityResidualNodalValues[iComp].begin(),
-                      d_preCondTotalDensityResidualVector.locally_owned_size());
-                  }
-                // Delete old history if it exceeds a pre-described
-                // length
-                d_mixingScheme.popOldHistory(d_dftParamsPtr->mixingHistory);
-
-                // Compute the mixing coefficients
-                d_mixingScheme.computeAndersonMixingCoeff(mixingVariables);
-                for (unsigned int iComp = 0; iComp < norms.size(); ++iComp)
+                d_mixingScheme.mixPreconditionedResidual(
+                  mixingVariables[0],
+                  d_preCondTotalDensityResidualVector.begin(),
+                  d_densityInNodalValues[0].begin(),
+                  d_densityInNodalValues[0].locally_owned_size());
+                for (unsigned int iComp = 1; iComp < norms.size(); ++iComp)
                   d_mixingScheme.mixVariable(
                     mixingVariables[iComp],
                     d_densityInNodalValues[iComp].begin(),
@@ -2702,13 +2784,38 @@ namespace dftfe
                           d_gradDensityResidualQuadValues[iComp].size());
                       }
                   }
+                if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+                  {
+                    if (scfIter == 1)
+                      d_gradPhiResQuadValues.resize(
+                        d_gradPhiOutQuadValues.size());
+                    computeResidualQuadData(
+                      d_gradPhiOutQuadValues,
+                      d_gradPhiInQuadValues,
+                      d_gradPhiResQuadValues,
+                      d_basisOperationsPtrElectroHost->JxWBasisData(),
+                      false);
+                    d_mixingScheme.addVariableToInHist(
+                      mixingVariable::gradPhi,
+                      d_gradPhiInQuadValues.data(),
+                      d_gradPhiInQuadValues.size());
+                    d_mixingScheme.addVariableToResidualHist(
+                      mixingVariable::gradPhi,
+                      d_gradPhiResQuadValues.data(),
+                      d_gradPhiResQuadValues.size());
+                  }
 
                 // Delete old history if it exceeds a pre-described
                 // length
                 d_mixingScheme.popOldHistory(d_dftParamsPtr->mixingHistory);
 
                 // Compute the mixing coefficients
-                d_mixingScheme.computeAndersonMixingCoeff(mixingVariables);
+                std::vector<mixingVariable> andersonMixingVariables =
+                  mixingVariables;
+                if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
+                  andersonMixingVariables[0] = mixingVariable::gradPhi;
+                d_mixingScheme.computeAndersonMixingCoeff(
+                  andersonMixingVariables);
 
                 // update the mixing variables
                 for (unsigned int iComp = 0; iComp < norms.size(); ++iComp)
@@ -2928,7 +3035,8 @@ namespace dftfe
           d_densityQuadratureIdElectro,
           d_phiTotRhoIn,
           d_phiInQuadValues,
-          dummy);
+          d_gradPhiInQuadValues,
+          true);
 
         //
         // impose integral phi equals 0
@@ -3540,7 +3648,8 @@ namespace dftfe
         //
         if ((d_dftParamsPtr->computeEnergyEverySCF &&
              d_numEigenValuesRR == d_numEigenValues) ||
-            d_dftParamsPtr->useEnergyResidualTolerance)
+            d_dftParamsPtr->useEnergyResidualTolerance ||
+            d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
           {
             if (d_dftParamsPtr->verbosity >= 2)
               pcout
@@ -3641,7 +3750,8 @@ namespace dftfe
               d_densityQuadratureIdElectro,
               d_phiTotRhoOut,
               d_phiOutQuadValues,
-              dummy);
+              d_gradPhiOutQuadValues,
+              true);
             computing_timer.leave_subsection("phiTot solve");
           }
         if (d_dftParamsPtr->useEnergyResidualTolerance)

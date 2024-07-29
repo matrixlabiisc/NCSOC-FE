@@ -774,6 +774,12 @@ namespace dftfe
           "[Standard] Mixing parameter to be used in density mixing schemes. For default value of 0.0, it is heuristically set for different mixing schemes (0.2 for Anderson, and 0.5 for Kerker and LRD.");
 
         prm.declare_entry(
+          "INVERSE KERKER MIXING PARAMETER",
+          "0.0",
+          dealii::Patterns::Double(-1e-12, 1000.0),
+          "[Standard] Mixing parameter to be used in for gradient of potential in density mixing schemes.");
+
+        prm.declare_entry(
           "SPIN MIXING ENHANCEMENT FACTOR",
           "4.0",
           dealii::Patterns::Double(-1e-12, 100.0),
@@ -1617,6 +1623,8 @@ namespace dftfe
       selfConsistentSolverEnergyTolerance = prm.get_double("ENERGY TOLERANCE");
       mixingHistory                       = prm.get_integer("MIXING HISTORY");
       mixingParameter                     = prm.get_double("MIXING PARAMETER");
+      inverseKerkerMixingParameter =
+        prm.get_double("INVERSE KERKER MIXING PARAMETER");
       spinMixingEnhancementFactor =
         prm.get_double("SPIN MIXING ENHANCEMENT FACTOR");
       adaptAndersonMixingParameter =
