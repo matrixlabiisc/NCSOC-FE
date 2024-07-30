@@ -2464,8 +2464,6 @@ namespace dftfe
         dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
           rhoNodalMassVec;
         computeRhoNodalMassVector(rhoNodalMassVec);
-        for (unsigned int i = 0; i < rhoNodalMassVec.size(); ++i)
-          rhoNodalMassVec[i] = rhoNodalMassVec[i]*0.636619772367581;
         for (unsigned int iMix = 0; iMix < mixingVariables.size(); ++iMix)
           d_mixingScheme.addMixingVariable(
             mixingVariables[iMix],
@@ -2485,7 +2483,7 @@ namespace dftfe
             for (unsigned int i = 0; i < gradRhoJxW.size(); ++i)
               gradRhoJxW[i] =
                 d_basisOperationsPtrElectroHost->JxWBasisData()[i /
-                3]*d_dftParamsPtr->inverseKerkerMixingParameter*72.9021613081648;
+                3]*d_dftParamsPtr->inverseKerkerMixingParameter;
             d_mixingScheme.addMixingVariable(
               mixingVariable::gradPhi,
               gradRhoJxW,
