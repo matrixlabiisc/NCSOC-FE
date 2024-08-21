@@ -414,6 +414,16 @@ namespace dftfe
               dftfe::basis::update_gradients | dftfe::basis::update_quadpoints |
               dftfe::basis::update_transpose;
 
+            dftfe::basis::UpdateFlags updateFlagsLPSP =
+              dftfe::basis::update_values | dftfe::basis::update_jxw;
+
+            dftfe::basis::UpdateFlags updateFlagsphiTotAX =
+              d_dftParamsPtr->useDevice &&
+                  (FEOrder != FEOrderElectro ||
+                   d_dftParamsPtr->usepCoarsenedSolve) ?
+                dftfe::basis::update_gradients :
+                dftfe::basis::update_default;
+
             std::vector<unsigned int> quadratureIndices{
               d_densityQuadratureIdElectro,
               d_lpspQuadratureIdElectro,
@@ -421,7 +431,7 @@ namespace dftfe
               d_phiTotAXQuadratureIdElectro};
             std::vector<dftfe::basis::UpdateFlags> updateFlags{
               updateFlagsAll,
-              updateFlagsAll,
+              updateFlagsLPSP,
               dftfe::basis::update_quadpoints,
               updateFlagsAll};
             d_basisOperationsPtrElectroHost->init(d_matrixFreeDataPRefined,

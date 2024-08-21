@@ -284,7 +284,18 @@ namespace dftfe
               dftfe::basis::update_inversejacobians |
               dftfe::basis::update_gradients | dftfe::basis::update_quadpoints |
               dftfe::basis::update_transpose;
-
+            dftfe::basis::UpdateFlags updateFlagsGLL =
+              dftfe::basis::update_values | dftfe::basis::update_jxw;
+            dftfe::basis::UpdateFlags updateFlagsLPSP =
+              dftfe::basis::update_values | dftfe::basis::update_jxw;
+            dftfe::basis::UpdateFlags updateFlagsfeOrderPlusOne =
+              dftfe::basis::update_gradients;
+            if (std::is_same<dataTypes::number, std::complex<double>>::value)
+              updateFlagsfeOrderPlusOne = updateFlagsfeOrderPlusOne |
+                                          dftfe::basis::update_values |
+                                          dftfe::basis::update_jxw;
+            dftfe::basis::UpdateFlags updateFlagssparsityPattern =
+              dftfe::basis::update_quadpoints;
             std::vector<unsigned int> quadratureIndices{
               d_densityQuadratureId,
               d_nlpspQuadratureId,
@@ -295,15 +306,17 @@ namespace dftfe
             std::vector<dftfe::basis::UpdateFlags> updateFlags{
               updateFlagsAll | dftfe::basis::update_collocation_gradients,
               updateFlagsAll,
-              updateFlagsAll,
-              updateFlagsAll,
-              updateFlagsAll,
-              updateFlagsAll};
+              updateFlagsGLL,
+              updateFlagsLPSP,
+              updateFlagsfeOrderPlusOne,
+              updateFlagssparsityPattern};
             if (d_dftParamsPtr->usepCoarsenedSolve &&
                 FE->tensor_degree() == C_pCoarsenedFEOrder<FEOrder>())
               {
+                dftfe::basis::UpdateFlags updateFlagsGLLFEorder =
+                  dftfe::basis::update_values;
                 quadratureIndices.push_back(d_gllQuadratureIdFEOrder);
-                updateFlags.push_back(updateFlagsAll);
+                updateFlags.push_back(updateFlagsGLLFEorder);
               }
             d_basisOperationsPtrHost->init(matrix_free_data,
                                            d_constraintsVector,
