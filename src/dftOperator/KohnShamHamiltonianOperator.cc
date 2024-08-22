@@ -1171,14 +1171,14 @@ namespace dftfe
       d_cellWaveFunctionMatrixSrcSinglePrec.resize(nCells * nDofsPerCell *
                                                    numWaveFunctions);
     if (d_cellWaveFunctionMatrixDst.size() <
-        d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
-      d_cellWaveFunctionMatrixDst.resize(d_cellsBlockSizeHX * nDofsPerCell *
-                                         numWaveFunctions);
+        d_nOMPThreads * d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
+      d_cellWaveFunctionMatrixDst.resize(d_nOMPThreads * d_cellsBlockSizeHX *
+                                         nDofsPerCell * numWaveFunctions);
     if (d_dftParamsPtr->useSinglePrecCheby &&
         d_cellWaveFunctionMatrixDstSinglePrec.size() <
-          d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
+          d_nOMPThreads * d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions)
       d_cellWaveFunctionMatrixDstSinglePrec.resize(
-        d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions);
+        d_nOMPThreads * d_cellsBlockSizeHX * nDofsPerCell * numWaveFunctions);
 
     if (d_dftParamsPtr->isPseudopotential)
       {
