@@ -2420,8 +2420,8 @@ namespace dftfe
         1e+4 :
         (d_dftParamsPtr->mixingMethod == "ANDERSON_WITH_KERKER" ||
              d_dftParamsPtr->mixingMethod == "ANDERSON_WITH_RESTA" ?
-           1e-3 :
-           2e-3);
+           1e-2 :
+           2e-2);
 
 
     if (d_dftParamsPtr->solverMode == "MD")
@@ -2474,16 +2474,14 @@ namespace dftfe
             d_dftParamsPtr->adaptAndersonMixingParameter);
         if (d_dftParamsPtr->inverseKerkerMixingParameter > 0.0)
           {
-            dftfe::utils::MemoryStorage<double,
-            dftfe::utils::MemorySpace::HOST>
+            dftfe::utils::MemoryStorage<double, dftfe::utils::MemorySpace::HOST>
               gradRhoJxW;
             gradRhoJxW.resize(
-              d_basisOperationsPtrElectroHost->JxWBasisData().size() * 3,
-              0.0);
+              d_basisOperationsPtrElectroHost->JxWBasisData().size() * 3, 0.0);
             for (unsigned int i = 0; i < gradRhoJxW.size(); ++i)
               gradRhoJxW[i] =
-                d_basisOperationsPtrElectroHost->JxWBasisData()[i /
-                3]*d_dftParamsPtr->inverseKerkerMixingParameter;
+                d_basisOperationsPtrElectroHost->JxWBasisData()[i / 3] *
+                d_dftParamsPtr->inverseKerkerMixingParameter;
             d_mixingScheme.addMixingVariable(
               mixingVariable::gradPhi,
               gradRhoJxW,
@@ -2669,7 +2667,8 @@ namespace dftfe
                   andersonMixingVariables[0] = mixingVariable::gradPhi;
 
                 // Compute the mixing coefficients
-                d_mixingScheme.computeAndersonMixingCoeff(andersonMixingVariables);
+                d_mixingScheme.computeAndersonMixingCoeff(
+                  andersonMixingVariables);
                 d_mixingScheme.getOptimizedResidual(
                   mixingVariables[0],
                   d_densityResidualNodalValues[0].begin(),
