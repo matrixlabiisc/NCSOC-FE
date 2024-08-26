@@ -48,10 +48,8 @@ namespace dftfe
     d_constraintsPRefinedOnlyHanging.reinit(d_locallyRelevantDofsPRefined);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
-    d_constraintsPRefinedOnlyHanging.make_consistent_in_parallel(
-      d_dofHandlerPRefined.locally_owned_dofs(),
-      d_locallyRelevantDofsPRefined,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
     d_constraintsPRefinedOnlyHanging.close();
 
     d_constraintsPRefined.clear();
@@ -107,10 +105,8 @@ namespace dftfe
     dealii::DoFTools::make_periodicity_constraints<3, 3>(periodicity_vector2,
                                                          d_constraintsPRefined);
 
-    d_constraintsPRefined.make_consistent_in_parallel(
-      d_dofHandlerPRefined.locally_owned_dofs(),
-      d_locallyRelevantDofsPRefined,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerPRefined, d_constraintsPRefined);
     d_constraintsPRefined.close();
 
     //
@@ -130,10 +126,8 @@ namespace dftfe
     d_constraintsRhoNodalOnlyHanging.reinit(d_locallyRelevantDofsRhoNodal);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
-    d_constraintsRhoNodalOnlyHanging.make_consistent_in_parallel(
-      d_dofHandlerRhoNodal.locally_owned_dofs(),
-      d_locallyRelevantDofsRhoNodal,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
     d_constraintsRhoNodalOnlyHanging.close();
 
     d_constraintsRhoNodal.clear();
@@ -157,10 +151,8 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(
       periodicity_vector_rhonodal, d_constraintsRhoNodal);
-    d_constraintsRhoNodal.make_consistent_in_parallel(
-      d_dofHandlerRhoNodal.locally_owned_dofs(),
-      d_locallyRelevantDofsRhoNodal,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerRhoNodal, d_constraintsRhoNodal);
 
     d_constraintsRhoNodal.close();
 
@@ -206,7 +198,6 @@ namespace dftfe
   {
     d_dofHandlerPRefined.distribute_dofs(d_dofHandlerPRefined.get_fe());
     d_dofHandlerRhoNodal.distribute_dofs(d_dofHandlerRhoNodal.get_fe());
-
     d_supportPointsPRefined.clear();
     dealii::DoFTools::map_dofs_to_support_points(dealii::MappingQ1<3, 3>(),
                                                  d_dofHandlerPRefined,
@@ -248,10 +239,8 @@ namespace dftfe
       d_constraintsRhoNodal,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    d_constraintsForHelmholtzRhoNodal.make_consistent_in_parallel(
-      d_dofHandlerRhoNodal.locally_owned_dofs(),
-      d_locallyRelevantDofsRhoNodal,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerRhoNodal, d_constraintsForHelmholtzRhoNodal);
     d_constraintsForHelmholtzRhoNodal.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForHelmholtzRhoNodal);
     d_helmholtzDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -277,10 +266,8 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    d_constraintsForTotalPotentialElectro.make_consistent_in_parallel(
-      d_dofHandlerPRefined.locally_owned_dofs(),
-      d_locallyRelevantDofsPRefined,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
     d_constraintsForTotalPotentialElectro.close();
 
     d_constraintsVectorElectro.push_back(
@@ -329,7 +316,6 @@ namespace dftfe
                                                     0.0);
         computing_timer.leave_subsection("Create atom bins");
       }
-
     MPI_Barrier(d_mpiCommParent);
     init_bins = MPI_Wtime() - init_bins;
     if (d_dftParamsPtr->verbosity >= 4)
@@ -353,10 +339,8 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    d_constraintsForPhiPrimeElectro.make_consistent_in_parallel(
-      d_dofHandlerPRefined.locally_owned_dofs(),
-      d_locallyRelevantDofsPRefined,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerPRefined, d_constraintsForPhiPrimeElectro);
     d_constraintsForPhiPrimeElectro.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForPhiPrimeElectro);
     d_phiPrimeDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -396,7 +380,6 @@ namespace dftfe
                         true);
     d_forceDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
 
-
     std::vector<dealii::Quadrature<1>> quadratureVector;
     quadratureVector.push_back(dealii::QGauss<1>(
       C_num1DQuad<C_rhoNodalPolyOrder<FEOrder, FEOrderElectro>()>()));
@@ -428,6 +411,7 @@ namespace dftfe
                                     d_constraintsVectorElectro,
                                     quadratureVector,
                                     additional_data);
+
     if (recomputeBasisData)
       {
         if (!vselfPerturbationUpdateForStress)
@@ -517,7 +501,6 @@ namespace dftfe
           }
       }
 #endif
-
     //
     // locate atom core nodes
     //
@@ -553,10 +536,8 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    d_constraintsForTotalPotentialElectro.make_consistent_in_parallel(
-      d_dofHandlerPRefined.locally_owned_dofs(),
-      d_locallyRelevantDofsPRefined,
-      mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
     d_constraintsForTotalPotentialElectro.close();
   }
 #include "dft.inst.cc"

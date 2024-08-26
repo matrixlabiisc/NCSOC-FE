@@ -196,14 +196,10 @@ namespace dftfe
     dealii::DoFTools::make_periodicity_constraints<3, 3>(
       periodicity_vector2Eigen, constraintsNoneEigen);
 
-
-    constraintsNone.make_consistent_in_parallel(locally_owned_dofs,
-                                                locally_relevant_dofs,
-                                                mpi_communicator);
-    constraintsNoneEigen.make_consistent_in_parallel(locally_owned_dofsEigen,
-                                                     locally_relevant_dofsEigen,
-                                                     mpi_communicator);
-
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      dofHandler, constraintsNone);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      dofHandlerEigen, constraintsNoneEigen);
     constraintsNone.close();
     constraintsNoneEigen.close();
 
@@ -218,12 +214,10 @@ namespace dftfe
                                                     d_noConstraints);
     dealii::DoFTools::make_hanging_node_constraints(dofHandlerEigen,
                                                     noConstraintsEigen);
-    d_noConstraints.make_consistent_in_parallel(locally_owned_dofs,
-                                                locally_relevant_dofs,
-                                                mpi_communicator);
-    noConstraintsEigen.make_consistent_in_parallel(locally_owned_dofsEigen,
-                                                   locally_relevant_dofsEigen,
-                                                   mpi_communicator);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      dofHandler, d_noConstraints);
+    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+      dofHandlerEigen, noConstraintsEigen);
     d_noConstraints.close();
     noConstraintsEigen.close();
 

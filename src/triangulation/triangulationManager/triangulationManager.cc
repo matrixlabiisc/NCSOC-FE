@@ -24,6 +24,7 @@
 
 #include <constants.h>
 #include <dftUtils.h>
+#include <vectorUtilities.h>
 #include <fileReaders.h>
 #include <meshGenUtils.h>
 #include <triangulationManager.h>

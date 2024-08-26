@@ -1307,8 +1307,8 @@ namespace dftfe
           constraintMatrix,
           dealii::AffineConstraints<
             double>::MergeConflictBehavior::left_object_wins);
-        d_vselfBinConstraintMatrices[4 * iBin].make_consistent_in_parallel(
-          locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
+        dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+          dofHandler, d_vselfBinConstraintMatrices[4 * iBin]);
         d_vselfBinConstraintMatrices[4 * iBin].close();
         constraintsVector.push_back(&(d_vselfBinConstraintMatrices[4 * iBin]));
 
@@ -1336,10 +1336,8 @@ namespace dftfe
               constraintMatrix,
               dealii::AffineConstraints<
                 double>::MergeConflictBehavior::left_object_wins);
-            d_vselfBinConstraintMatrices[4 * iBin + idim + 1]
-              .make_consistent_in_parallel(locally_owned_dofs,
-                                           locally_relevant_dofs,
-                                           mpi_communicator);
+            dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+              dofHandler, d_vselfBinConstraintMatrices[4 * iBin + idim + 1]);
             d_vselfBinConstraintMatrices[4 * iBin + idim + 1].close();
             constraintsVector.push_back(
               &(d_vselfBinConstraintMatrices[4 * iBin + idim + 1]));
@@ -1568,8 +1566,8 @@ namespace dftfe
               constraintMatrix,
               dealii::AffineConstraints<
                 double>::MergeConflictBehavior::left_object_wins);
-            d_vselfBinConstraintMatrices[4 * iBin].make_consistent_in_parallel(
-              locally_owned_dofs, locally_relevant_dofs, mpi_communicator);
+            dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+              dofHandler, d_vselfBinConstraintMatrices[4 * iBin]);
             d_vselfBinConstraintMatrices[4 * iBin].close();
             constraintsVector.push_back(
               &(d_vselfBinConstraintMatrices[4 * iBin]));
@@ -1606,10 +1604,10 @@ namespace dftfe
                       constraintMatrix,
                       dealii::AffineConstraints<
                         double>::MergeConflictBehavior::left_object_wins);
-                    d_vselfBinConstraintMatrices[4 * iBin + idim + 1]
-                      .make_consistent_in_parallel(locally_owned_dofs,
-                                                   locally_relevant_dofs,
-                                                   mpi_communicator);
+                    dftfe::vectorTools::
+                      makeAffineConstraintsConsistentInParallel(
+                        dofHandler,
+                        d_vselfBinConstraintMatrices[4 * iBin + idim + 1]);
                     d_vselfBinConstraintMatrices[4 * iBin + idim + 1].close();
                     constraintsVector.push_back(
                       &(d_vselfBinConstraintMatrices[4 * iBin + idim + 1]));
