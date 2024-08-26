@@ -187,6 +187,9 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(d_periodicity_vector,
                                                          d_constraintsMoveMesh);
+    d_constraintsMoveMesh.make_consistent_in_parallel(d_locally_owned_dofs,
+                                                      d_locally_relevant_dofs,
+                                                      mpi_communicator);
     d_constraintsMoveMesh.close();
 
     if (d_dftParams.createConstraintsFromSerialDofhandler)

@@ -811,6 +811,9 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(periodicity_vector,
                                                          constraints);
+    constraints.make_consistent_in_parallel(dofHandler.locally_owned_dofs(),
+                                            locally_relevant_dofs,
+                                            mpi_communicator);
     constraints.close();
 
     dealii::IndexSet locally_active_dofs_debug;

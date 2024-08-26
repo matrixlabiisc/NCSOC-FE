@@ -197,6 +197,12 @@ namespace dftfe
       periodicity_vector2Eigen, constraintsNoneEigen);
 
 
+    constraintsNone.make_consistent_in_parallel(locally_owned_dofs,
+                                                locally_relevant_dofs,
+                                                mpi_communicator);
+    constraintsNoneEigen.make_consistent_in_parallel(locally_owned_dofsEigen,
+                                                     locally_relevant_dofsEigen,
+                                                     mpi_communicator);
 
     constraintsNone.close();
     constraintsNoneEigen.close();
@@ -212,6 +218,12 @@ namespace dftfe
                                                     d_noConstraints);
     dealii::DoFTools::make_hanging_node_constraints(dofHandlerEigen,
                                                     noConstraintsEigen);
+    d_noConstraints.make_consistent_in_parallel(locally_owned_dofs,
+                                                locally_relevant_dofs,
+                                                mpi_communicator);
+    noConstraintsEigen.make_consistent_in_parallel(locally_owned_dofsEigen,
+                                                   locally_relevant_dofsEigen,
+                                                   mpi_communicator);
     d_noConstraints.close();
     noConstraintsEigen.close();
 

@@ -48,6 +48,10 @@ namespace dftfe
     d_constraintsPRefinedOnlyHanging.reinit(d_locallyRelevantDofsPRefined);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
+    d_constraintsPRefinedOnlyHanging.make_consistent_in_parallel(
+      d_dofHandlerPRefined.locally_owned_dofs(),
+      d_locallyRelevantDofsPRefined,
+      mpi_communicator);
     d_constraintsPRefinedOnlyHanging.close();
 
     d_constraintsPRefined.clear();
@@ -103,6 +107,10 @@ namespace dftfe
     dealii::DoFTools::make_periodicity_constraints<3, 3>(periodicity_vector2,
                                                          d_constraintsPRefined);
 
+    d_constraintsPRefined.make_consistent_in_parallel(
+      d_dofHandlerPRefined.locally_owned_dofs(),
+      d_locallyRelevantDofsPRefined,
+      mpi_communicator);
     d_constraintsPRefined.close();
 
     //
@@ -122,6 +130,10 @@ namespace dftfe
     d_constraintsRhoNodalOnlyHanging.reinit(d_locallyRelevantDofsRhoNodal);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
+    d_constraintsRhoNodalOnlyHanging.make_consistent_in_parallel(
+      d_dofHandlerRhoNodal.locally_owned_dofs(),
+      d_locallyRelevantDofsRhoNodal,
+      mpi_communicator);
     d_constraintsRhoNodalOnlyHanging.close();
 
     d_constraintsRhoNodal.clear();
@@ -145,6 +157,10 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(
       periodicity_vector_rhonodal, d_constraintsRhoNodal);
+    d_constraintsRhoNodal.make_consistent_in_parallel(
+      d_dofHandlerRhoNodal.locally_owned_dofs(),
+      d_locallyRelevantDofsRhoNodal,
+      mpi_communicator);
 
     d_constraintsRhoNodal.close();
 
@@ -228,11 +244,14 @@ namespace dftfe
     applyHomogeneousDirichletBC(d_dofHandlerRhoNodal,
                                 d_constraintsRhoNodalOnlyHanging,
                                 d_constraintsForHelmholtzRhoNodal);
-    d_constraintsForHelmholtzRhoNodal.close();
     d_constraintsForHelmholtzRhoNodal.merge(
       d_constraintsRhoNodal,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
+    d_constraintsForHelmholtzRhoNodal.make_consistent_in_parallel(
+      d_dofHandlerRhoNodal.locally_owned_dofs(),
+      d_locallyRelevantDofsRhoNodal,
+      mpi_communicator);
     d_constraintsForHelmholtzRhoNodal.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForHelmholtzRhoNodal);
     d_helmholtzDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -254,11 +273,14 @@ namespace dftfe
     applyHomogeneousDirichletBC(d_dofHandlerPRefined,
                                 d_constraintsPRefinedOnlyHanging,
                                 d_constraintsForTotalPotentialElectro);
-    d_constraintsForTotalPotentialElectro.close();
     d_constraintsForTotalPotentialElectro.merge(
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
+    d_constraintsForTotalPotentialElectro.make_consistent_in_parallel(
+      d_dofHandlerPRefined.locally_owned_dofs(),
+      d_locallyRelevantDofsPRefined,
+      mpi_communicator);
     d_constraintsForTotalPotentialElectro.close();
 
     d_constraintsVectorElectro.push_back(
@@ -327,11 +349,14 @@ namespace dftfe
     applyHomogeneousDirichletBC(d_dofHandlerPRefined,
                                 d_constraintsPRefinedOnlyHanging,
                                 d_constraintsForPhiPrimeElectro);
-    d_constraintsForPhiPrimeElectro.close();
     d_constraintsForPhiPrimeElectro.merge(
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
+    d_constraintsForPhiPrimeElectro.make_consistent_in_parallel(
+      d_dofHandlerPRefined.locally_owned_dofs(),
+      d_locallyRelevantDofsPRefined,
+      mpi_communicator);
     d_constraintsForPhiPrimeElectro.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForPhiPrimeElectro);
     d_phiPrimeDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -524,11 +549,14 @@ namespace dftfe
     applyMultipoleDirichletBC(d_dofHandlerPRefined,
                               d_constraintsPRefinedOnlyHanging,
                               d_constraintsForTotalPotentialElectro);
-    d_constraintsForTotalPotentialElectro.close();
     d_constraintsForTotalPotentialElectro.merge(
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
+    d_constraintsForTotalPotentialElectro.make_consistent_in_parallel(
+      d_dofHandlerPRefined.locally_owned_dofs(),
+      d_locallyRelevantDofsPRefined,
+      mpi_communicator);
     d_constraintsForTotalPotentialElectro.close();
   }
 #include "dft.inst.cc"
