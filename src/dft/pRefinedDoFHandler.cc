@@ -48,8 +48,9 @@ namespace dftfe
     d_constraintsPRefinedOnlyHanging.reinit(d_locallyRelevantDofsPRefined);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerPRefined, d_constraintsPRefinedOnlyHanging);
     d_constraintsPRefinedOnlyHanging.close();
 
     d_constraintsPRefined.clear();
@@ -105,8 +106,9 @@ namespace dftfe
     dealii::DoFTools::make_periodicity_constraints<3, 3>(periodicity_vector2,
                                                          d_constraintsPRefined);
 
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerPRefined, d_constraintsPRefined);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerPRefined, d_constraintsPRefined);
     d_constraintsPRefined.close();
 
     //
@@ -126,8 +128,9 @@ namespace dftfe
     d_constraintsRhoNodalOnlyHanging.reinit(d_locallyRelevantDofsRhoNodal);
     dealii::DoFTools::make_hanging_node_constraints(
       d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerRhoNodal, d_constraintsRhoNodalOnlyHanging);
     d_constraintsRhoNodalOnlyHanging.close();
 
     d_constraintsRhoNodal.clear();
@@ -151,8 +154,9 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(
       periodicity_vector_rhonodal, d_constraintsRhoNodal);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerRhoNodal, d_constraintsRhoNodal);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerRhoNodal, d_constraintsRhoNodal);
 
     d_constraintsRhoNodal.close();
 
@@ -239,8 +243,9 @@ namespace dftfe
       d_constraintsRhoNodal,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerRhoNodal, d_constraintsForHelmholtzRhoNodal);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerRhoNodal, d_constraintsForHelmholtzRhoNodal);
     d_constraintsForHelmholtzRhoNodal.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForHelmholtzRhoNodal);
     d_helmholtzDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -266,8 +271,9 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
     d_constraintsForTotalPotentialElectro.close();
 
     d_constraintsVectorElectro.push_back(
@@ -339,8 +345,9 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerPRefined, d_constraintsForPhiPrimeElectro);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerPRefined, d_constraintsForPhiPrimeElectro);
     d_constraintsForPhiPrimeElectro.close();
     d_constraintsVectorElectro.push_back(&d_constraintsForPhiPrimeElectro);
     d_phiPrimeDofHandlerIndexElectro = d_constraintsVectorElectro.size() - 1;
@@ -536,8 +543,9 @@ namespace dftfe
       d_constraintsPRefined,
       dealii::AffineConstraints<
         double>::MergeConflictBehavior::right_object_wins);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerPRefined, d_constraintsForTotalPotentialElectro);
     d_constraintsForTotalPotentialElectro.close();
   }
 #include "dft.inst.cc"

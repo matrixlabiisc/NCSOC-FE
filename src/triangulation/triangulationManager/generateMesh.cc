@@ -811,8 +811,9 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(periodicity_vector,
                                                          constraints);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(dofHandler,
-                                                                  constraints);
+    if (d_dftParams.constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        dofHandler, constraints);
     constraints.close();
 
     dealii::IndexSet locally_active_dofs_debug;

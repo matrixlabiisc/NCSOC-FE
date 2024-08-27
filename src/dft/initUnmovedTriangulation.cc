@@ -196,10 +196,12 @@ namespace dftfe
     dealii::DoFTools::make_periodicity_constraints<3, 3>(
       periodicity_vector2Eigen, constraintsNoneEigen);
 
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      dofHandler, constraintsNone);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      dofHandlerEigen, constraintsNoneEigen);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        dofHandler, constraintsNone);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        dofHandlerEigen, constraintsNoneEigen);
     constraintsNone.close();
     constraintsNoneEigen.close();
 
@@ -214,10 +216,12 @@ namespace dftfe
                                                     d_noConstraints);
     dealii::DoFTools::make_hanging_node_constraints(dofHandlerEigen,
                                                     noConstraintsEigen);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      dofHandler, d_noConstraints);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      dofHandlerEigen, noConstraintsEigen);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        dofHandler, d_noConstraints);
+    if (d_dftParamsPtr->constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        dofHandlerEigen, noConstraintsEigen);
     d_noConstraints.close();
     noConstraintsEigen.close();
 

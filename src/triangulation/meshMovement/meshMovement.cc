@@ -187,8 +187,9 @@ namespace dftfe
 
     dealii::DoFTools::make_periodicity_constraints<3, 3>(d_periodicity_vector,
                                                          d_constraintsMoveMesh);
-    dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
-      d_dofHandlerMoveMesh, d_constraintsMoveMesh);
+    if (d_dftParams.constraintsParallelCheck)
+      dftfe::vectorTools::makeAffineConstraintsConsistentInParallel(
+        d_dofHandlerMoveMesh, d_constraintsMoveMesh);
 
     d_constraintsMoveMesh.close();
 
