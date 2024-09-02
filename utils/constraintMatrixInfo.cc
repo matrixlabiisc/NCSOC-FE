@@ -312,15 +312,15 @@ namespace dftfe
       const unsigned int blockSize = fieldVector.numVectors();
       unsigned int       count     = 0;
       const unsigned int inc       = 1;
-      std::vector<T>     newValuesBlock(blockSize, 0.0);
       for (unsigned int i = 0; i < d_rowIdsLocal.size(); ++i)
         {
-          std::fill(newValuesBlock.begin(),
-                    newValuesBlock.end(),
-                    d_inhomogenities[i]);
-
           const dealii::types::global_dof_index startingLocalDofIndexRow =
             d_rowIdsLocal[i] * blockSize;
+          
+          std::fill(fieldVector.data() + startingLocalDofIndexRow,
+                    fieldVector.data() + startingLocalDofIndexRow + blockSize,
+                    d_inhomogenities[i]);
+
 
           for (unsigned int j = 0; j < d_rowSizes[i]; ++j)
             {
@@ -339,14 +339,10 @@ namespace dftfe
                        &alpha,
                        fieldVector.data() + startingLocalDofIndexColumn,
                        &inc,
-                       &newValuesBlock[0],
+                       fieldVector.data() + startingLocalDofIndexRow,
                        &inc);
               count++;
             }
-
-          std::copy(&newValuesBlock[0],
-                    &newValuesBlock[0] + blockSize,
-                    fieldVector.data() + startingLocalDofIndexRow);
         }
     }
 
