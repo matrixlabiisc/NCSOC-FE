@@ -481,7 +481,6 @@ namespace dftfe
       ValueType *                    addToVec,
       const dftfe::global_size_type *addToVecStartingContiguousBlockIds) const
     {
-#pragma omp parallel for
       for (unsigned int iBlock = 0; iBlock < numContiguousBlocks; ++iBlock)
         std::transform(addFromVec + iBlock * contiguousBlockSize,
                        addFromVec + (iBlock + 1) * contiguousBlockSize,
@@ -501,7 +500,6 @@ namespace dftfe
       ValueType3 *                   addToVec,
       const dftfe::global_size_type *addToVecStartingContiguousBlockIds) const
     {
-#pragma omp parallel for
       for (unsigned int iBlock = 0; iBlock < numContiguousBlocks; ++iBlock)
         {
           ValueType1 coeff = a * s[iBlock];
@@ -524,7 +522,6 @@ namespace dftfe
       std::complex<float> *          addToVec,
       const dftfe::global_size_type *addToVecStartingContiguousBlockIds) const
     {
-#pragma omp parallel for
       for (unsigned int iBlock = 0; iBlock < numContiguousBlocks; ++iBlock)
         {
           double coeff = a * s[iBlock];
